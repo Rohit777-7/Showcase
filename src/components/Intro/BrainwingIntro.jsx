@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -6,7 +6,9 @@ import "../../styles/intro.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
-function BrainwingIntro() {
+const AUTO_ADVANCE_DELAY = 2600;
+
+function BrainwingIntro({ autoAdvance }) {
   const sectionRef = useRef(null);
   const logoRef = useRef(null);
   const logoMarkRef = useRef(null);
@@ -108,6 +110,31 @@ function BrainwingIntro() {
 
     return () => ctx.revert();
   }, []);
+
+  // Once the preloader hands off, auto-scroll into the
+  // cinematic lady page so the user isn't required to
+  // scroll manually to see it.
+  useEffect(() => {
+    if (!autoAdvance) return;
+
+    const timer = setTimeout(() => {
+      // Respect a user who already started scrolling on their own.
+      if (window.scrollY > 50) return;
+
+      const nextSection = document.querySelector(
+        ".lady-scroll-section"
+      );
+
+      if (!nextSection) return;
+
+      window.scrollTo({
+        top: nextSection.offsetTop,
+        behavior: "smooth",
+      });
+    }, AUTO_ADVANCE_DELAY);
+
+    return () => clearTimeout(timer);
+  }, [autoAdvance]);
 
   return (
     <section
