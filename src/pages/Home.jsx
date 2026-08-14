@@ -1,35 +1,3 @@
-// import BrainwingIntro from "../components/Intro/BrainwingIntro";
-
-// function Home() {
-//   return (
-//     <main>
-//       <BrainwingIntro />
-
-//       {/* 
-//         TEMPORARY NEXT SECTION
-
-//         Later this will become your lady video experience.
-//       */}
-//       <section
-//         style={{
-//           height: "100vh",
-//           background: "#050505",
-//           display: "flex",
-//           alignItems: "center",
-//           justifyContent: "center",
-//           color: "white",
-//           fontFamily: "Arial, sans-serif",
-//           letterSpacing: "4px",
-//         }}
-//       >
-//         PAGE 2 — LADY VIDEO EXPERIENCE
-//       </section>
-//     </main>
-//   );
-// }
-
-// export default Home;
-
 import BrainwingIntro from "../components/Intro/BrainwingIntro";
 import LadyScroll from "../components/Lady/LadyScroll";
 
@@ -37,11 +5,7 @@ function Home({ introReady }) {
   return (
     <main>
       {/* PAGE 1 — BRAINWING INTRO */}
-<<<<<<< Updated upstream
-      
-=======
       <BrainwingIntro autoAdvance={introReady} />
->>>>>>> Stashed changes
 
       {/* PAGE 2 — CINEMATIC LADY VIDEO */}
       <LadyScroll />
