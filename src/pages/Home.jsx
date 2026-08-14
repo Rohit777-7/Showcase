@@ -1,30 +1,18 @@
 import BrainwingIntro from "../components/Intro/BrainwingIntro";
 import LadyScroll from "../components/Lady/LadyScroll";
+import WorldMap from "./WorldMap";
 
-function Home({ introReady }) {
+function Home() {
   return (
     <main>
       {/* PAGE 1 — BRAINWING INTRO */}
+     
 
       {/* PAGE 2 — CINEMATIC LADY VIDEO */}
       <LadyScroll />
 
-      {/* PAGE 3 — GLOBAL MAP */}
-      <section
-        style={{
-          height: "100vh",
-          background: "#000",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Arial, sans-serif",
-          letterSpacing: "5px",
-          fontSize: "14px",
-        }}
-      >
-        GLOBAL MAP
-      </section>
+      {/* PAGE 3 — 3D GLOBAL MAP */}
+      <WorldMap />
     </main>
   );
 }

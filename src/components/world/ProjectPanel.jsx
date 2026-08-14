@@ -1,110 +1,105 @@
+import { useEffect, useRef } from "react";
+import gsap from "gsap";
+
 function ProjectPanel({
-  project,
+  location,
   onClose,
-  onOpen,
 }) {
-  if (!project) return null;
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!location) return;
+
+    gsap.fromTo(
+      panelRef.current,
+      {
+        opacity: 0,
+        x: 80,
+      },
+      {
+        opacity: 1,
+        x: 0,
+        duration: 0.7,
+        ease: "power3.out",
+      }
+    );
+  }, [location]);
+
+  if (!location) {
+    return null;
+  }
 
   return (
-    <div
-      style={{
-        position: "absolute",
-
-        right: "35px",
-        bottom: "35px",
-
-        width: "300px",
-
-        padding: "24px",
-
-        background:
-          "rgba(3,7,12,0.88)",
-
-        backdropFilter:
-          "blur(20px)",
-
-        border:
-          "1px solid rgba(255,255,255,0.12)",
-
-        color: "white",
-
-        zIndex: 30,
-      }}
+    <aside
+      ref={panelRef}
+      className="project-panel"
     >
-      <div
-        style={{
-          fontSize: "9px",
-          letterSpacing: "3px",
-          opacity: 0.45,
-        }}
+      <button
+        className="project-close"
+        onClick={onClose}
       >
-        LOCATION
+        ×
+      </button>
+
+      <div className="project-location">
+        GLOBAL PROJECT
       </div>
 
-      <h2
-        style={{
-          margin: "8px 0",
-          fontSize: "28px",
-          fontWeight: 300,
-          letterSpacing: "2px",
-        }}
-      >
-        {project.city}
+      <h2>
+        {location.city}
       </h2>
 
-      <p
-        style={{
-          fontSize: "12px",
-          lineHeight: 1.6,
-          opacity: 0.65,
-        }}
-      >
-        {project.description}
-      </p>
+      <div className="project-country">
+        {location.country}
+      </div>
 
-      <button
-        onClick={onOpen}
-        style={{
-          marginTop: "15px",
-          padding: "12px 18px",
+      <div className="project-count">
+        {String(
+          location.projects.length
+        ).padStart(2, "0")}{" "}
+        PROJECTS
+      </div>
 
-          background: "white",
-          color: "black",
+      <div className="project-list">
+        {location.projects.map(
+          (project, index) => (
+            <div
+              className="project-item"
+              key={project.name}
+            >
+              <div className="project-number">
+                {String(
+                  index + 1
+                ).padStart(2, "0")}
+              </div>
 
-          border: "none",
+              <div className="project-content">
+                <h3>
+                  {project.name}
+                </h3>
 
-          cursor: "pointer",
+                <span>
+                  {project.category}
+                </span>
 
-          letterSpacing: "2px",
-          fontSize: "10px",
-        }}
-      >
-        VIEW PROJECT →
-      </button>
+                <p>
+                  {project.description}
+                </p>
 
-      <button
-        onClick={onClose}
-        style={{
-          marginLeft: "8px",
-
-          padding: "12px 18px",
-
-          background:
-            "transparent",
-
-          color: "white",
-
-          border:
-            "1px solid rgba(255,255,255,0.2)",
-
-          cursor: "pointer",
-
-          fontSize: "10px",
-        }}
-      >
-        CLOSE
-      </button>
-    </div>
+                <a
+                  href={project.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  VIEW PROJECT
+                  <span> →</span>
+                </a>
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    </aside>
   );
 }
 

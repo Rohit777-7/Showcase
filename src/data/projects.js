@@ -5,67 +5,68 @@ export const projects = [
     country: "India",
     lat: 19.076,
     lng: 72.8777,
-    type: "region",
 
-    name: "Mumbai Projects",
+    services: [
+      "3D Architectural Visualization",
+      "Real Estate Experience",
+      "3D Walkthrough",
+      "Project Films",
+    ],
+  },
 
-    projects: [
-      {
-        id: "borivali-01",
-        city: "Borivali",
-        lat: 19.2307,
-        lng: 72.8567,
+  {
+    id: "borivali",
+    city: "Borivali",
+    country: "India",
+    lat: 19.2307,
+    lng: 72.8567,
 
-        name: "Borivali Project",
-        category: "Web Experience",
+    services: [
+      "3D Visualization",
+      "Digital Sales Experience",
+      "Project Presentation",
+    ],
+  },
 
-        description:
-          "An interactive digital experience created by Brainwing Innovation.",
+  {
+    id: "thane",
+    city: "Thane",
+    country: "India",
+    lat: 19.1978,
+    lng: 72.9798,
 
-        technologies: ["React", "Three.js", "GSAP"],
+    services: [
+      "3D Walkthrough",
+      "Scale Model Visualization",
+      "Real Estate Experience",
+    ],
+  },
 
-        buildingModel: "/models/borivali-building.glb",
+  {
+    id: "colaba",
+    city: "Colaba",
+    country: "India",
+    lat: 18.9067,
+    lng: 72.8147,
 
-        projectUrl: "https://example.com",
-      },
+    services: [
+      "Premium Real Estate Experience",
+      "3D Visualization",
+      "Project Films",
+    ],
+  },
 
-      {
-        id: "thane-01",
-        city: "Thane",
-        lat: 19.2183,
-        lng: 72.9781,
+  {
+    id: "bangalore",
+    city: "Bangalore",
+    country: "India",
+    lat: 12.9716,
+    lng: 77.5946,
 
-        name: "Thane Project",
-        category: "Digital Experience",
-
-        description:
-          "A premium digital experience developed for a Thane-based project.",
-
-        technologies: ["React", "Three.js"],
-
-        buildingModel: "/models/thane-building.glb",
-
-        projectUrl: "https://example.com",
-      },
-
-      {
-        id: "colaba-01",
-        city: "Colaba",
-        lat: 18.9067,
-        lng: 72.8147,
-
-        name: "Colaba Project",
-        category: "Interactive Website",
-
-        description:
-          "An immersive interactive project developed in Colaba.",
-
-        technologies: ["React", "Three.js", "GSAP"],
-
-        buildingModel: "/models/colaba-building.glb",
-
-        projectUrl: "https://example.com",
-      },
+    services: [
+      "3D Architectural Visualization",
+      "Digital Sales Experience",
+      "Interactive Presentation",
     ],
   },
 
@@ -73,22 +74,13 @@ export const projects = [
     id: "london",
     city: "London",
     country: "United Kingdom",
+    lat: 51.5072,
+    lng: -0.1276,
 
-    lat: 51.5074,
-    lng: -0.1278,
-
-    type: "project",
-
-    name: "London Project",
-    category: "International Experience",
-
-    description:
-      "An international digital experience created by Brainwing Innovation.",
-
-    technologies: ["React", "Three.js", "GSAP"],
-
-    buildingModel: "/models/london-building.glb",
-
-    projectUrl: "https://example.com",
+    services: [
+      "International Project Experience",
+      "3D Visualization",
+      "Digital Presentation",
+    ],
   },
 ];

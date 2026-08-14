@@ -1,400 +1,462 @@
-import { useState } from "react";
-import { Canvas } from "@react-three/fiber";
-
-import Globe from "../components/world/Globe";
-import BuildingPopup from "../components/world/BuildingPopup";
-import ProjectPanel from "../components/world/ProjectPanel";
+import { useEffect, useRef, useState } from "react";
+import * as maptilersdk from "@maptiler/sdk";
+import "@maptiler/sdk/dist/maptiler-sdk.css";
 
 import { projects } from "../data/projects";
+import "../styles/world-map.css";
 
 function WorldMap() {
-  const [selectedLocation, setSelectedLocation] =
-    useState(null);
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
 
-  const [selectedProject, setSelectedProject] =
-    useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
-  const [showMumbaiProjects, setShowMumbaiProjects] =
-    useState(false);
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
 
-  const mumbai = projects.find(
-    (project) => project.id === "mumbai"
-  );
+    if (mapRef.current) return;
 
-  const handleLocationClick = (
-    location
-  ) => {
-    if (location.id === "mumbai") {
-      setSelectedLocation(location);
-      setSelectedProject(null);
-      setShowMumbaiProjects(true);
+    const apiKey = import.meta.env.VITE_MAPTILER_KEY;
 
+    if (!apiKey) {
+      console.error(
+        "MapTiler API key missing. Add VITE_MAPTILER_KEY to .env"
+      );
       return;
     }
 
-    setSelectedLocation(location);
-    setSelectedProject(location);
-  };
+    maptilersdk.config.apiKey = apiKey;
 
-  const handleMumbaiProjectClick = (
-    project
-  ) => {
-    setSelectedProject(project);
-  };
+    /*
+    =====================================================
+    CREATE MAP
+    =====================================================
+    */
 
-  const handleBack = () => {
-    setSelectedProject(null);
+    const map = new maptilersdk.Map({
+      container: mapContainerRef.current,
+
+      // Dark MapTiler map
+      style: maptilersdk.MapStyle.STREETS.DARK,
+
+      /*
+      Worldwide starting position
+      */
+      center: [55, 25],
+
+      zoom: 2.7,
+
+      /*
+      Cinematic perspective
+      */
+      pitch: 35,
+
+      bearing: 0,
+
+      /*
+      Hide default controls
+      */
+      navigationControl: false,
+      geolocateControl: false,
+      attributionControl: false,
+
+      /*
+      Interaction
+      */
+      dragPan: true,
+      dragRotate: true,
+      touchZoomRotate: true,
+      scrollZoom: true,
+    });
+
+    mapRef.current = map;
+
+    /*
+    =====================================================
+    MAP LOADED
+    =====================================================
+    */
+
+    map.on("load", () => {
+      console.log("Map loaded successfully");
+      console.log("Brainwing projects:", projects);
+
+      /*
+      ===================================================
+      BRAINWING CONNECTION LINE
+      ===================================================
+      */
+
+      const routeCoordinates = projects
+        .filter(
+          (project) =>
+            typeof project.lng === "number" &&
+            typeof project.lat === "number"
+        )
+        .map((project) => [
+          project.lng,
+          project.lat,
+        ]);
+
+      if (routeCoordinates.length > 1) {
+        map.addSource("brainwing-route", {
+          type: "geojson",
+
+          data: {
+            type: "Feature",
+
+            geometry: {
+              type: "LineString",
+              coordinates: routeCoordinates,
+            },
+          },
+        });
+
+        map.addLayer({
+          id: "brainwing-route",
+
+          type: "line",
+
+          source: "brainwing-route",
+
+          paint: {
+            "line-color": "#8ceff5",
+
+            "line-width": 1.5,
+
+            "line-opacity": 0.55,
+
+            "line-blur": 1,
+          },
+        });
+      }
+
+      /*
+      ===================================================
+      CREATE PROJECT MARKERS
+      ===================================================
+      */
+
+      projects.forEach((project) => {
+        console.log(
+          `Creating marker for ${project.city}`,
+          project.lng,
+          project.lat
+        );
+
+        /*
+        -----------------------------------------------
+        Marker element
+        -----------------------------------------------
+        */
+
+        const markerElement =
+          document.createElement("button");
+
+        markerElement.className =
+          "brainwing-project-marker";
+
+        markerElement.type = "button";
+
+        markerElement.setAttribute(
+          "aria-label",
+          `Open ${project.city} projects`
+        );
+
+        /*
+        Marker HTML
+        */
+
+        markerElement.innerHTML = `
+          <span class="project-marker-pulse"></span>
+          <span class="project-marker-ring"></span>
+          <span class="project-marker-dot"></span>
+        `;
+
+        /*
+        -----------------------------------------------
+        Click marker
+        -----------------------------------------------
+        */
+
+        markerElement.addEventListener(
+          "click",
+          (event) => {
+            event.stopPropagation();
+
+            console.log(
+              "Selected project:",
+              project.city
+            );
+
+            /*
+            Open panel
+            */
+
+            setSelectedLocation(project);
+
+            /*
+            Cinematic zoom
+            */
+
+            map.flyTo({
+              center: [
+                project.lng,
+                project.lat,
+              ],
+
+              zoom:
+                project.id === "london"
+                  ? 11
+                  : 12.5,
+
+              pitch: 55,
+
+              bearing: -18,
+
+              duration: 1800,
+
+              essential: true,
+            });
+          }
+        );
+
+        /*
+        -----------------------------------------------
+        Add marker at EXACT coordinates
+        -----------------------------------------------
+        */
+
+        new maptilersdk.Marker({
+          element: markerElement,
+
+          anchor: "center",
+        })
+          .setLngLat([
+            project.lng,
+            project.lat,
+          ])
+          .addTo(map);
+      });
+    });
+
+    /*
+    =====================================================
+    CLEANUP
+    =====================================================
+    */
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  /*
+  =====================================================
+  RESET MAP
+  =====================================================
+  */
+
+  const resetMap = () => {
     setSelectedLocation(null);
-    setShowMumbaiProjects(false);
+
+    if (!mapRef.current) return;
+
+    mapRef.current.flyTo({
+      center: [55, 25],
+
+      zoom: 2.7,
+
+      pitch: 35,
+
+      bearing: 0,
+
+      duration: 1500,
+
+      essential: true,
+    });
   };
 
-  const handleOpenProject = () => {
-    if (!selectedProject?.projectUrl)
-      return;
-
-    window.open(
-      selectedProject.projectUrl,
-      "_blank"
-    );
-  };
+  /*
+  =====================================================
+  RENDER
+  =====================================================
+  */
 
   return (
-    <main
-      style={{
-        position: "fixed",
-        inset: 0,
+    <section className="world-map-page">
 
-        width: "100vw",
-        height: "100vh",
+      {/* =================================================
+          MAP
+      ================================================= */}
 
-        overflow: "hidden",
-
-        background: "#000",
-      }}
-    >
-      {/* Background */}
       <div
-        style={{
-          position: "absolute",
-          inset: 0,
-
-          background:
-            "radial-gradient(circle at center, #07131e 0%, #02060b 50%, #000 100%)",
-        }}
+        ref={mapContainerRef}
+        className="world-map"
       />
 
-      {/* TOP LEFT */}
-      <div
-        style={{
-          position: "absolute",
+      {/* =================================================
+          DARK CINEMATIC OVERLAY
+      ================================================= */}
 
-          top: "30px",
-          left: "40px",
+      <div className="map-dark-overlay" />
 
-          zIndex: 20,
+      {/* =================================================
+          TOP LEFT BRAND
+      ================================================= */}
 
-          color: "white",
-
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "13px",
-            letterSpacing: "5px",
-          }}
-        >
-          BRAINWING
+      <div className="world-brand">
+        <div>
+          B R A I N W I N G
         </div>
 
-        <div
-          style={{
-            marginTop: "5px",
-
-            fontSize: "8px",
-
-            letterSpacing: "4px",
-
-            opacity: 0.45,
-          }}
-        >
-          INNOVATION
-        </div>
+        <small>
+          I N N O V A T I O N
+        </small>
       </div>
 
-      {/* TOP CENTER */}
-      <div
-        style={{
-          position: "absolute",
+      {/* =================================================
+          TOP CENTER
+      ================================================= */}
 
-          top: "34px",
-          left: "50%",
-
-          transform:
-            "translateX(-50%)",
-
-          zIndex: 20,
-
-          color: "white",
-
-          fontSize: "10px",
-
-          letterSpacing: "5px",
-
-          opacity: 0.65,
-
-          pointerEvents: "none",
-        }}
-      >
-        {showMumbaiProjects
-          ? "MUMBAI PROJECTS"
-          : "GLOBAL PROJECTS"}
+      <div className="world-heading">
+        G L O B A L&nbsp;&nbsp; P R O J E C T S
       </div>
 
-      {/* MENU */}
-      <div
-        style={{
-          position: "absolute",
+      {/* =================================================
+          HAMBURGER
+      ================================================= */}
 
-          top: "30px",
-          right: "40px",
-
-          zIndex: 20,
-
-          width: "30px",
-
-          pointerEvents: "none",
-        }}
-      >
-        {[1, 2, 3].map(
-          (item) => (
-            <div
-              key={item}
-              style={{
-                height: "1px",
-
-                width: "100%",
-
-                background: "white",
-
-                marginBottom: "7px",
-              }}
-            />
-          )
-        )}
+      <div className="world-menu">
+        <span />
+        <span />
+        <span />
       </div>
 
-      {/* BACK BUTTON */}
-      {showMumbaiProjects && (
-        <button
-          onClick={handleBack}
-          style={{
-            position: "absolute",
+      {/* =================================================
+          BOTTOM LEFT
+      ================================================= */}
 
-            top: "85px",
-            left: "40px",
+      <div className="world-bottom">
 
-            zIndex: 30,
-
-            background:
-              "rgba(255,255,255,0.06)",
-
-            border:
-              "1px solid rgba(255,255,255,0.15)",
-
-            color: "white",
-
-            padding:
-              "10px 15px",
-
-            cursor: "pointer",
-
-            fontSize: "9px",
-
-            letterSpacing: "2px",
-          }}
-        >
-          ← WORLD
-        </button>
-      )}
-
-      {/* 3D WORLD */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-
-          zIndex: 5,
-        }}
-      >
-        <Canvas
-          dpr={[1, 2]}
-          camera={{
-            position: [0, 0, 5.5],
-            fov: 42,
-          }}
-          gl={{
-            antialias: true,
-            alpha: true,
-          }}
-        >
-          <ambientLight
-            intensity={0.8}
-          />
-
-          <directionalLight
-            position={[5, 5, 5]}
-            intensity={2}
-          />
-
-          <pointLight
-            position={[
-              -5,
-              -3,
-              4,
-            ]}
-            intensity={1.5}
-            color="#62caff"
-          />
-
-          <Globe
-            projects={projects}
-            selectedLocation={
-              selectedLocation
-            }
-            onSelectLocation={
-              handleLocationClick
-            }
-            showMumbaiProjects={
-              showMumbaiProjects
-            }
-            onSelectMumbaiProject={
-              handleMumbaiProjectClick
-            }
-          />
-
-          {/* Building */}
-          {selectedProject && (
-            <BuildingPopup
-              project={
-                selectedProject
-              }
-              onClose={() =>
-                setSelectedProject(
-                  null
-                )
-              }
-              onOpenProject={
-                handleOpenProject
-              }
-            />
-          )}
-        </Canvas>
-      </div>
-
-      {/* BOTTOM LEFT */}
-      <div
-        style={{
-          position: "absolute",
-
-          left: "40px",
-          bottom: "35px",
-
-          zIndex: 20,
-
-          color: "white",
-
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "9px",
-
-            letterSpacing: "4px",
-
-            opacity: 0.4,
-
-            marginBottom: "8px",
-          }}
-        >
+        <small>
           03
-        </div>
+        </small>
 
-        <div
-          style={{
-            fontSize: "34px",
+        <h1>
+          WORLDWIDE
+        </h1>
 
-            fontWeight: 300,
+        <p>
+          OUR WORK ACROSS THE WORLD
+        </p>
 
-            letterSpacing: "5px",
-          }}
-        >
-          {showMumbaiProjects
-            ? "MUMBAI"
-            : "WORLDWIDE"}
-        </div>
-
-        <div
-          style={{
-            marginTop: "8px",
-
-            fontSize: "10px",
-
-            letterSpacing: "2px",
-
-            opacity: 0.4,
-          }}
-        >
-          {showMumbaiProjects
-            ? "OUR PROJECTS IN MUMBAI"
-            : "OUR WORK ACROSS THE WORLD"}
-        </div>
       </div>
 
-      {/* BOTTOM RIGHT */}
-      {!selectedProject && (
-        <div
-          style={{
-            position: "absolute",
+      {/* =================================================
+          BOTTOM RIGHT
+      ================================================= */}
 
-            right: "40px",
-            bottom: "40px",
-
-            zIndex: 20,
-
-            color: "white",
-
-            fontSize: "9px",
-
-            letterSpacing: "3px",
-
-            opacity: 0.4,
-
-            pointerEvents: "none",
-          }}
-        >
-          CLICK LOCATION · DRAG TO EXPLORE
+      {!selectedLocation && (
+        <div className="map-instruction">
+          CLICK A LOCATION TO EXPLORE
         </div>
       )}
 
-      {/* PROJECT PANEL */}
-      {selectedProject && (
-        <ProjectPanel
-          project={
-            selectedProject
-          }
-          onClose={() =>
-            setSelectedProject(
-              null
-            )
-          }
-          onOpen={
-            handleOpenProject
-          }
-        />
+      {/* =================================================
+          LOCATION PANEL
+      ================================================= */}
+
+      {selectedLocation && (
+        <aside className="location-panel">
+
+          {/* Close */}
+
+          <button
+            className="location-close"
+            onClick={resetMap}
+            aria-label="Close location"
+          >
+            ×
+          </button>
+
+          {/* Small heading */}
+
+          <div className="panel-kicker">
+            PROJECT LOCATION
+          </div>
+
+          {/* City */}
+
+          <h2>
+            {selectedLocation.city}
+          </h2>
+
+          {/* Country */}
+
+          <div className="panel-country">
+            {selectedLocation.country}
+          </div>
+
+          <div className="panel-divider" />
+
+          {/* Services */}
+
+          <div className="panel-section-title">
+            BRAINWING SERVICES
+          </div>
+
+          <div className="service-list">
+
+            {selectedLocation.services?.map(
+              (service, index) => (
+                <div
+                  className="service-item"
+                  key={service}
+                >
+
+                  <span>
+                    {String(index + 1).padStart(
+                      2,
+                      "0"
+                    )}
+                  </span>
+
+                  <p>
+                    {service}
+                  </p>
+
+                </div>
+              )
+            )}
+
+          </div>
+
+          {/* Project button */}
+
+          <button
+            className="project-button"
+            onClick={() => {
+              console.log(
+                "Projects:",
+                selectedLocation.city
+              );
+            }}
+          >
+            VIEW PROJECTS
+
+            <span>
+              →
+            </span>
+          </button>
+
+        </aside>
       )}
-    </main>
+
+    </section>
   );
 }
 
