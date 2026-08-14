@@ -5,7 +5,6 @@ function Home({ introReady }) {
   return (
     <main>
       {/* PAGE 1 — BRAINWING INTRO */}
-      <BrainwingIntro autoAdvance={introReady} />
 
       {/* PAGE 2 — CINEMATIC LADY VIDEO */}
       <LadyScroll />

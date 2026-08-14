@@ -16,7 +16,7 @@ function App() {
       {loading && <Preloader onComplete={handlePreloaderComplete} />}
 
       <Routes>
-        <Route path="/" element={<Home introReady={!loading} />} />
+        <Route path="/" element={<Home />} />
       </Routes>
     </BrowserRouter>
   );
