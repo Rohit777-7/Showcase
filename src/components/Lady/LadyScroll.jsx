@@ -4,64 +4,45 @@ import "./LadyScroll.css";
 function LadyScroll() {
   const sectionRef = useRef(null);
   const videoRef = useRef(null);
+  const hasPlayedRef = useRef(false);
 
   useEffect(() => {
     const video = videoRef.current;
-    const section = sectionRef.current;
 
-    if (!video || !section) return;
+    if (!video) return;
 
     video.pause();
     video.currentTime = 0;
 
-    const handleScroll = () => {
-      const rect = section.getBoundingClientRect();
-
-      const scrollDistance =
-        section.offsetHeight - window.innerHeight;
-
-      const scrolled = Math.min(
-        Math.max(-rect.top, 0),
-        scrollDistance
-      );
-
-      const progress =
-        scrollDistance > 0
-          ? scrolled / scrollDistance
-          : 0;
-
-      if (video.duration) {
-        video.currentTime =
-          progress * video.duration;
-      }
-    };
-
-    const handleLoadedMetadata = () => {
-      handleScroll();
-    };
-
-    video.addEventListener(
-      "loadedmetadata",
-      handleLoadedMetadata
-    );
-
-    window.addEventListener(
+    const interactionEvents = [
       "scroll",
-      handleScroll,
-      { passive: true }
-    );
+      "wheel",
+      "touchstart",
+      "keydown",
+      "pointerdown",
+    ];
 
-    handleScroll();
+    const handleInteraction = () => {
+      if (hasPlayedRef.current) return;
+
+      hasPlayedRef.current = true;
+
+      video.play().catch(() => {});
+
+      interactionEvents.forEach((event) =>
+        window.removeEventListener(event, handleInteraction)
+      );
+    };
+
+    interactionEvents.forEach((event) =>
+      window.addEventListener(event, handleInteraction, {
+        passive: true,
+      })
+    );
 
     return () => {
-      video.removeEventListener(
-        "loadedmetadata",
-        handleLoadedMetadata
-      );
-
-      window.removeEventListener(
-        "scroll",
-        handleScroll
+      interactionEvents.forEach((event) =>
+        window.removeEventListener(event, handleInteraction)
       );
     };
   }, []);
@@ -84,40 +65,15 @@ function LadyScroll() {
 
         <div className="lady-dark-overlay" />
 
-        <div className="lady-top">
-          <span>—</span>
-          <span>
-            CRAFTING DIGITAL EXPERIENCES
-          </span>
-        </div>
+       
 
-        <div className="lady-menu">
-          <span />
-          <span />
-          <span />
-        </div>
+      
 
         <div className="lady-side-info">
 
-          <div className="lady-line">
-            <div className="lady-dot active" />
-          </div>
+        
 
-          <div>
-            <strong>01</strong>
-            <span>BACK VIEW</span>
-          </div>
-
-          <div>
-            <strong>02</strong>
-            <span>FRONT VIEW</span>
-          </div>
-
-          <div>
-            <strong>03</strong>
-            <span>SIDE ANGLE</span>
-          </div>
-
+         
         </div>
 
         <div className="lady-scroll-text">
