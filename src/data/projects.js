@@ -3,8 +3,11 @@ export const projects = [
     id: "mumbai",
     city: "Mumbai",
     country: "India",
+    region: "Maharashtra, India",
     lat: 19.076,
     lng: 72.8777,
+
+    projectCount: 4,
 
     services: [
       "3D Architectural Visualization",
@@ -18,8 +21,11 @@ export const projects = [
     id: "borivali",
     city: "Borivali",
     country: "India",
+    region: "Maharashtra, India",
     lat: 19.2307,
     lng: 72.8567,
+
+    projectCount: 2,
 
     services: [
       "3D Visualization",
@@ -32,8 +38,11 @@ export const projects = [
     id: "thane",
     city: "Thane",
     country: "India",
+    region: "Maharashtra, India",
     lat: 19.1978,
     lng: 72.9798,
+
+    projectCount: 2,
 
     services: [
       "3D Walkthrough",
@@ -46,8 +55,11 @@ export const projects = [
     id: "colaba",
     city: "Colaba",
     country: "India",
+    region: "Maharashtra, India",
     lat: 18.9067,
     lng: 72.8147,
+
+    projectCount: 2,
 
     services: [
       "Premium Real Estate Experience",
@@ -60,8 +72,11 @@ export const projects = [
     id: "bangalore",
     city: "Bangalore",
     country: "India",
+    region: "Karnataka, India",
     lat: 12.9716,
     lng: 77.5946,
+
+    projectCount: 1,
 
     services: [
       "3D Architectural Visualization",
@@ -74,8 +89,11 @@ export const projects = [
     id: "london",
     city: "London",
     country: "United Kingdom",
+    region: "United Kingdom",
     lat: 51.5072,
     lng: -0.1276,
+
+    projectCount: 1,
 
     services: [
       "International Project Experience",

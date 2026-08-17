@@ -1,24 +1,31 @@
-/* =====================================================
-   WORLD MAP
-===================================================== */
-
-.world-map-page {
+.world-map-story {
   position: relative;
+  width: 100%;
+  /*
+  min-height is set inline in WorldMap.jsx, scaled to the
+  journey's total timeline length so it grows automatically
+  as cities are added to projects.js.
+  */
+  background: #02070b;
+  color: #ffffff;
+  overflow: clip;
+}
+
+/* =========================================
+   STICKY MAP
+========================================= */
+
+.world-map-sticky {
+  position: sticky;
+  top: 0;
 
   width: 100%;
   height: 100vh;
 
   overflow: hidden;
 
-  background: #02070c;
-
-  color: #ffffff;
+  background: #02070b;
 }
-
-
-/* =====================================================
-   MAP
-===================================================== */
 
 .world-map {
   position: absolute;
@@ -27,73 +34,87 @@
 
   width: 100%;
   height: 100%;
+
+  background: #02070b;
 }
 
-
-/* =====================================================
+/* =========================================
    CINEMATIC OVERLAY
-===================================================== */
+========================================= */
 
-.map-dark-overlay {
+.map-vignette {
   position: absolute;
 
   inset: 0;
 
+  pointer-events: none;
+
   z-index: 5;
+
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      rgba(0, 0, 0, 0.12) 65%,
+      rgba(0, 0, 0, 0.48) 100%
+    );
+}
+
+.map-gradient {
+  position: absolute;
+
+  inset: 0;
 
   pointer-events: none;
 
+  z-index: 6;
+
   background:
     linear-gradient(
-      90deg,
-      rgba(0, 8, 15, 0.28) 0%,
-      rgba(0, 8, 15, 0.04) 55%,
-      rgba(0, 4, 10, 0.5) 100%
+      180deg,
+      rgba(0, 0, 0, 0.45) 0%,
+      transparent 20%,
+      transparent 74%,
+      rgba(0, 0, 0, 0.5) 100%
     );
-
-  box-shadow:
-    inset 0 0 180px
-    rgba(0, 0, 0, 0.75);
 }
 
-
-/* =====================================================
+/* =========================================
    BRAND
-===================================================== */
+========================================= */
 
 .world-brand {
   position: absolute;
 
-  top: 42px;
-  left: 45px;
+  top: 46px;
+  left: 48px;
 
   z-index: 20;
 
-  pointer-events: none;
+  letter-spacing: 8px;
 
   font-size: 14px;
 
-  letter-spacing: 8px;
-
-  color: #ffffff;
+  font-weight: 400;
 }
 
 .world-brand small {
   display: block;
 
-  margin-top: 18px;
+  margin-top: 25px;
 
-  font-size: 8px;
+  margin-left: 18px;
+
+  color: rgba(255, 255, 255, 0.48);
+
+  font-size: 9px;
 
   letter-spacing: 7px;
-
-  opacity: 0.5;
 }
 
-
-/* =====================================================
-   CENTER TITLE
-===================================================== */
+/* =========================================
+   HEADING
+========================================= */
 
 .world-heading {
   position: absolute;
@@ -105,128 +126,169 @@
 
   z-index: 20;
 
-  pointer-events: none;
+  color: rgba(255, 255, 255, 0.72);
+
+  font-size: 11px;
+
+  letter-spacing: 8px;
 
   white-space: nowrap;
+}
+
+/* =========================================
+   BOTTOM LEFT
+========================================= */
+
+.world-bottom {
+  position: absolute;
+
+  left: 48px;
+  bottom: 45px;
+
+  z-index: 20;
+}
+
+.world-bottom small {
+  display: block;
+
+  margin-bottom: 15px;
+
+  color: rgba(255, 255, 255, 0.45);
+
+  font-size: 8px;
+
+  letter-spacing: 6px;
+}
+
+.world-bottom h1 {
+  margin: 0;
+
+  font-size: clamp(
+    38px,
+    4vw,
+    58px
+  );
+
+  font-weight: 300;
+
+  letter-spacing: 4px;
+}
+
+.world-bottom p {
+  margin-top: 12px;
+
+  color: rgba(255, 255, 255, 0.5);
 
   font-size: 10px;
 
-  letter-spacing: 6px;
-
-  opacity: 0.65;
+  letter-spacing: 5px;
 }
 
+/* =========================================
+   SCROLL HINT
+========================================= */
 
-/* =====================================================
-   MENU
-===================================================== */
-
-.world-menu {
+.map-scroll-hint {
   position: absolute;
 
-  top: 42px;
-  right: 45px;
+  left: 50%;
+  bottom: 42px;
 
-  z-index: 30;
+  transform: translateX(-50%);
 
-  width: 42px;
+  z-index: 20;
 
   display: flex;
 
   flex-direction: column;
 
-  gap: 8px;
-}
+  align-items: center;
 
-.world-menu span {
-  width: 100%;
+  gap: 15px;
 
-  height: 1px;
-
-  background: #ffffff;
-
-  opacity: 0.85;
-}
-
-
-/* =====================================================
-   BOTTOM LEFT
-===================================================== */
-
-.world-bottom {
-  position: absolute;
-
-  left: 45px;
-  bottom: 40px;
-
-  z-index: 20;
-
-  pointer-events: none;
-}
-
-.world-bottom small {
-  font-size: 8px;
-
-  letter-spacing: 5px;
-
-  opacity: 0.45;
-}
-
-.world-bottom h1 {
-  margin: 12px 0 0;
-
-  font-size: 36px;
-
-  line-height: 1;
-
-  font-weight: 300;
-
-  letter-spacing: 6px;
-}
-
-.world-bottom p {
-  margin-top: 13px;
+  color: rgba(255, 255, 255, 0.75);
 
   font-size: 9px;
 
-  letter-spacing: 3px;
-
-  opacity: 0.5;
-}
-
-
-/* =====================================================
-   MAP INSTRUCTION
-===================================================== */
-
-.map-instruction {
-  position: absolute;
-
-  right: 45px;
-  bottom: 45px;
-
-  z-index: 20;
+  letter-spacing: 6px;
 
   pointer-events: none;
-
-  font-size: 8px;
-
-  letter-spacing: 4px;
-
-  opacity: 0.55;
 }
 
-
-/* =====================================================
-   LOCATION MARKER
-===================================================== */
-
-.brainwing-location-marker {
+.scroll-mouse {
   position: relative;
 
-  width: 42px;
-  height: 42px;
+  width: 24px;
+  height: 40px;
 
+  border: 1px solid
+    rgba(255, 255, 255, 0.7);
+
+  border-radius: 20px;
+}
+
+.scroll-mouse span {
+  position: absolute;
+
+  top: 8px;
+  left: 50%;
+
+  width: 3px;
+  height: 7px;
+
+  transform: translateX(-50%);
+
+  border-radius: 5px;
+
+  background: white;
+
+  animation:
+    scrollDot 1.7s
+    infinite
+    ease-in-out;
+}
+
+@keyframes scrollDot {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, 0);
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+
+    transform:
+      translate(-50%, 15px);
+  }
+}
+
+/* =========================================
+   MARKERS
+========================================= */
+
+/*
+The marker's root element IS the anchor box MapTiler
+centers on the coordinate (anchor: "center" in JS), so it
+must be exactly the pin's 28x28 footprint — nothing else
+in here may affect that box's size, or the pin drifts off
+the real lat/lng. The pulse and label are pulled out with
+position: absolute so they can't expand it.
+*/
+
+.brainwing-scroll-marker {
+  position: relative;
+
+  width: 28px;
+  height: 28px;
   padding: 0;
 
   border: 0;
@@ -236,168 +298,163 @@
   cursor: pointer;
 }
 
-
-/* =====================================================
-   MARKER RING
-===================================================== */
-
-.marker-ring {
-  position: absolute;
-
-  top: 4px;
-  right: 4px;
-  bottom: 4px;
-  left: 4px;
-
-  border-radius: 50%;
-
-  border: 1px solid
-    rgba(150, 245, 255, 0.95);
-
-  box-shadow:
-    0 0 8px
-    rgba(80, 230, 255, 0.9),
-
-    0 0 25px
-    rgba(80, 230, 255, 0.5);
-}
-
-
-/* =====================================================
-   CENTER DOT
-===================================================== */
-
-.marker-dot {
-  position: absolute;
-
-  top: 50%;
-  left: 50%;
-
-  width: 11px;
-  height: 11px;
-
-  transform:
-    translate(-50%, -50%);
-
-  border-radius: 50%;
-
-  background: #e9ffff;
-
-  box-shadow:
-    0 0 10px #7cf3ff,
-    0 0 25px #42dce9;
-}
-
-
-/* =====================================================
-   PULSE
-===================================================== */
-
 .marker-pulse {
   position: absolute;
 
   inset: 0;
 
+  border: 1px solid
+    rgba(125, 245, 255, 0.9);
+
   border-radius: 50%;
 
-  border:
-    1px solid
-    rgba(100, 235, 255, 0.5);
-
   animation:
-    markerPulse 2s infinite;
+    markerPulse 2s
+    infinite
+    ease-out;
 }
 
 @keyframes markerPulse {
-
   0% {
-    transform: scale(0.6);
-
     opacity: 0.8;
+
+    transform: scale(0.7);
   }
 
   100% {
-    transform: scale(1.6);
-
     opacity: 0;
+
+    transform: scale(1.8);
   }
 }
 
+.marker-pin {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
 
-/* =====================================================
-   CITY LABEL
-===================================================== */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-.brainwing-city-label {
-  margin-left: 28px;
+  border-radius: 50%;
 
-  pointer-events: none;
+  background: rgba(4, 12, 18, 0.85);
 
-  white-space: nowrap;
-}
-
-.brainwing-city-label span {
-  display: inline-block;
-
-  padding: 7px 12px;
-
-  background:
-    rgba(2, 12, 18, 0.9);
-
-  border:
-    1px solid
-    rgba(140, 240, 255, 0.16);
-
-  color: #ffffff;
-
-  font-size: 9px;
-
-  letter-spacing: 2px;
+  border: 1px solid rgba(140, 240, 255, 0.55);
 
   box-shadow:
-    0 8px 25px
-    rgba(0, 0, 0, 0.45);
+    0 0 10px rgba(80, 230, 255, 0.35);
+
+  transition:
+    background 0.3s,
+    border-color 0.3s,
+    box-shadow 0.3s,
+    transform 0.3s;
 }
 
+.marker-number {
+  color: #9be7ff;
 
-/* =====================================================
-   RIGHT PANEL
-===================================================== */
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
 
-.location-panel {
+.marker-label {
+  position: absolute;
+
+  top: 50%;
+  left: 100%;
+
+  transform: translateY(-50%);
+
+  margin-left: 10px;
+
+  padding: 5px 10px;
+
+  white-space: nowrap;
+
+  color: rgba(255, 255, 255, 0.75);
+
+  font-size: 9px;
+  letter-spacing: 2px;
+
+  background: rgba(2, 8, 13, 0.6);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 3px;
+
+  transition:
+    color 0.3s,
+    background 0.3s,
+    border-color 0.3s;
+}
+
+.brainwing-scroll-marker.is-active .marker-pin {
+  background: #baffff;
+  border-color: #baffff;
+  transform: scale(1.15);
+
+  box-shadow:
+    0 0 10px rgba(186, 255, 255, 0.9),
+    0 0 24px rgba(120, 245, 255, 0.6);
+}
+
+.brainwing-scroll-marker.is-active .marker-number {
+  color: #04141a;
+}
+
+.brainwing-scroll-marker.is-active .marker-label {
+  color: #ffffff;
+
+  background: rgba(4, 20, 26, 0.85);
+
+  border-color: rgba(186, 255, 255, 0.5);
+}
+
+/* =========================================
+   PROJECT PANEL
+========================================= */
+
+.map-project-panel {
   position: absolute;
 
   top: 0;
   right: 0;
 
-  z-index: 50;
+  width: min(
+    390px,
+    31vw
+  );
 
-  width: 390px;
   height: 100%;
 
-  box-sizing: border-box;
+  z-index: 30;
 
   padding:
     145px
-    45px
+    48px
     50px;
+
+  box-sizing: border-box;
 
   background:
     linear-gradient(
-      145deg,
-      rgba(3, 18, 27, 0.98),
-      rgba(2, 9, 15, 0.98)
+      180deg,
+      rgba(3, 15, 25, 0.97),
+      rgba(2, 9, 15, 0.94)
     );
 
-  border-left:
-    1px solid
-    rgba(120, 235, 255, 0.12);
+  border-left: 1px solid
+    rgba(140, 240, 255, 0.18);
 
   backdrop-filter:
-    blur(20px);
+    blur(18px);
 
   animation:
-    panelIn 0.7s
+    panelIn 0.8s
     cubic-bezier(
       0.22,
       1,
@@ -407,191 +464,247 @@
 }
 
 @keyframes panelIn {
-
   from {
+    opacity: 0;
+
     transform:
-      translateX(100%);
+      translateX(100px);
   }
 
   to {
+    opacity: 1;
+
     transform:
       translateX(0);
   }
 }
 
-
-/* =====================================================
-   CLOSE
-===================================================== */
-
-.location-close {
+.panel-close {
   position: absolute;
 
-  top: 42px;
-  right: 42px;
+  top: 44px;
+  right: 44px;
 
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
 
-  border:
-    1px solid
-    rgba(255, 255, 255, 0.25);
+  border: 1px solid
+    rgba(255, 255, 255, 0.2);
 
   background: transparent;
 
-  color: #ffffff;
+  color: white;
 
-  font-size: 22px;
+  font-size: 24px;
 
   font-weight: 200;
 
   cursor: pointer;
 
-  transition: 0.3s;
+  transition:
+    background 0.3s,
+    border-color 0.3s;
 }
 
-.location-close:hover {
+.panel-close:hover {
+  background:
+    rgba(255, 255, 255, 0.08);
+
   border-color:
-    rgba(130, 240, 255, 0.8);
-
-  color: #9ff6ff;
+    rgba(255, 255, 255, 0.6);
 }
-
-
-/* =====================================================
-   PANEL KICKER
-===================================================== */
 
 .panel-kicker {
+  color: #7fefff;
+
   font-size: 8px;
 
-  letter-spacing: 4px;
-
-  color: #86eff8;
-
-  opacity: 0.85;
+  letter-spacing: 6px;
 }
 
+.map-project-panel h2 {
+  margin:
+    34px 0 8px;
 
-/* =====================================================
-   LOCATION NAME
-===================================================== */
-
-.location-panel h2 {
-  margin: 18px 0 0;
-
-  font-size: 40px;
-
-  line-height: 1;
+  font-size: 46px;
 
   font-weight: 300;
 
-  letter-spacing: 5px;
+  letter-spacing: 4px;
 }
-
-
-/* =====================================================
-   COUNTRY
-===================================================== */
 
 .panel-country {
-  margin-top: 10px;
+  margin: 0;
 
-  font-size: 9px;
+  color:
+    rgba(255, 255, 255, 0.45);
 
-  letter-spacing: 3px;
+  font-size: 10px;
 
-  opacity: 0.45;
+  letter-spacing: 4px;
 }
 
+.panel-coordinates {
+  margin: 10px 0 0;
 
-/* =====================================================
-   DIVIDER
-===================================================== */
+  color: #7defff;
 
-.panel-divider {
+  font-size: 10px;
+
+  letter-spacing: 2px;
+
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-line {
   width: 100%;
 
   height: 1px;
 
   margin:
-    35px 0;
+    55px 0 42px;
 
   background:
     linear-gradient(
       90deg,
-      rgba(120, 240, 255, 0.5),
+      rgba(117, 239, 255, 0.8),
       transparent
     );
 }
 
+.panel-services-title {
+  margin-bottom: 25px;
 
-/* =====================================================
-   SECTION TITLE
-===================================================== */
-
-.panel-section-title {
-  margin-bottom: 10px;
+  color:
+    rgba(255, 255, 255, 0.45);
 
   font-size: 8px;
 
-  letter-spacing: 4px;
-
-  opacity: 0.5;
+  letter-spacing: 5px;
 }
 
-
-/* =====================================================
-   SERVICES
-===================================================== */
-
-.service-item {
+.panel-services {
   display: flex;
+
+  flex-direction: column;
+}
+
+.panel-service {
+  display: grid;
+
+  grid-template-columns:
+    30px 1fr;
+
+  gap: 8px;
 
   align-items: center;
 
-  gap: 15px;
+  min-height: 63px;
 
-  padding: 16px 0;
-
-  border-bottom:
-    1px solid
-    rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.08);
 }
 
-.service-item span {
-  flex-shrink: 0;
-
-  color: #82edf7;
+.panel-service span {
+  color: #7defff;
 
   font-size: 8px;
 
   letter-spacing: 2px;
 }
 
-.service-item p {
+.panel-service p {
   margin: 0;
 
-  font-size: 9px;
+  color:
+    rgba(255, 255, 255, 0.85);
 
-  line-height: 1.5;
+  font-size: 10px;
 
   letter-spacing: 1.5px;
 
-  opacity: 0.85;
+  line-height: 1.6;
 }
 
+/* =========================================
+   MEDIA PREVIEW
+========================================= */
 
-/* =====================================================
-   PROJECT BUTTON
-===================================================== */
+.panel-media {
+  position: relative;
+  overflow: hidden;
 
-.project-button {
+  width: 100%;
+  height: 130px;
+
+  margin-top: 30px;
+  padding: 0;
+
+  border: 1px solid rgba(140, 240, 255, 0.16);
+  border-radius: 8px;
+
+  background: linear-gradient(
+    150deg,
+    rgba(18, 40, 52, 0.9),
+    rgba(4, 10, 16, 0.95)
+  );
+
+  cursor: pointer;
+}
+
+.panel-media-glow {
+  position: absolute;
+  inset: 0;
+
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(120, 240, 255, 0.16),
+      transparent 60%
+    );
+}
+
+.panel-media-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 46px;
+  height: 46px;
+
+  transform: translate(-50%, -50%);
+
+  color: #04141a;
+
+  background: rgba(186, 255, 255, 0.9);
+
+  border-radius: 50%;
+
+  box-shadow: 0 0 20px rgba(120, 245, 255, 0.45);
+
+  transition: transform 0.3s, background 0.3s;
+}
+
+.panel-media:hover .panel-media-play {
+  transform: translate(-50%, -50%) scale(1.08);
+
+  background: #ffffff;
+}
+
+/* =========================================
+   VIEW PROJECT BUTTON
+========================================= */
+
+.view-projects-button {
   width: 100%;
 
-  margin-top: 35px;
+  height: 58px;
 
-  padding: 17px 20px;
+  margin-top: 42px;
 
   display: flex;
 
@@ -599,69 +712,498 @@
 
   justify-content: space-between;
 
+  padding: 0 20px;
+
+  border: 1px solid
+    rgba(124, 238, 255, 0.35);
+
   background:
-    rgba(100, 225, 240, 0.03);
+    rgba(10, 30, 40, 0.35);
 
-  border:
-    1px solid
-    rgba(120, 240, 255, 0.35);
-
-  color: #ffffff;
-
-  font-size: 8px;
-
-  letter-spacing: 3px;
+  color: white;
 
   cursor: pointer;
 
   transition:
     background 0.3s,
-    border 0.3s;
+    border-color 0.3s;
 }
 
-.project-button:hover {
+.view-projects-button span {
+  font-size: 8px;
+
+  letter-spacing: 4px;
+}
+
+.view-projects-button strong {
+  font-size: 20px;
+
+  font-weight: 300;
+}
+
+.view-projects-button:hover {
   background:
-    rgba(100, 225, 240, 0.1);
+    rgba(100, 235, 255, 0.08);
 
   border-color:
-    #8ff6ff;
+    rgba(124, 238, 255, 0.8);
 }
 
-.project-button span {
+/* =========================================
+   JOURNEY SIDEBAR
+========================================= */
+
+.journey-sidebar {
+  position: absolute;
+
+  top: 118px;
+  left: 32px;
+  bottom: 32px;
+
+  z-index: 25;
+
+  display: flex;
+  flex-direction: column;
+
+  width: 300px;
+
+  padding: 22px 20px;
+
+  background:
+    linear-gradient(
+      165deg,
+      rgba(6, 16, 24, 0.55),
+      rgba(3, 9, 14, 0.78)
+    );
+
+  border: 1px solid rgba(140, 240, 255, 0.12);
+  border-radius: 14px;
+
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.journey-sidebar-header {
+  flex-shrink: 0;
+
+  margin-bottom: 16px;
+
+  padding-bottom: 14px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.journey-sidebar-title {
+  color: rgba(255, 255, 255, 0.6);
+
+  font-size: 10px;
+  letter-spacing: 3px;
+}
+
+.journey-sidebar-meta {
+  margin-top: 8px;
+
+  color: rgba(255, 255, 255, 0.35);
+
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.journey-meta-dot {
+  margin: 0 6px;
+
+  color: #7defff;
+}
+
+.journey-list {
+  position: relative;
+
+  flex: 1;
+  overflow-y: auto;
+
+  margin: 0;
+  padding: 0 2px 0 0;
+
+  list-style: none;
+}
+
+.journey-list::before {
+  content: "";
+
+  position: absolute;
+
+  top: 14px;
+  bottom: 14px;
+  left: 13px;
+
+  width: 1px;
+
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.journey-item button {
+  position: relative;
+
+  display: grid;
+  grid-template-columns: 28px 1fr;
+
+  align-items: center;
+  gap: 14px;
+
+  width: 100%;
+  padding: 8px 0;
+
+  border: 0;
+  background: none;
+
+  color: inherit;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.journey-index {
+  position: relative;
+  z-index: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+
+  border-radius: 50%;
+
+  background: #050d14;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+
+  color: rgba(255, 255, 255, 0.55);
+
+  font-size: 9px;
+  letter-spacing: 0.5px;
+
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.journey-item.is-active .journey-index {
+  background: #7ff7ff;
+  border-color: #7ff7ff;
+
+  color: #04141a;
+
+  box-shadow: 0 0 12px rgba(127, 247, 255, 0.6);
+}
+
+.journey-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-width: 0;
+}
+
+.journey-thumb {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+
+  width: 54px;
+  height: 42px;
+
+  border-radius: 6px;
+
+  background:
+    linear-gradient(
+      160deg,
+      rgba(20, 48, 62, 0.9),
+      rgba(4, 10, 16, 0.95)
+    );
+
+  border: 1px solid rgba(140, 240, 255, 0.15);
+
+  color: rgba(140, 240, 255, 0.4);
+
   font-size: 18px;
+  font-weight: 300;
+}
 
+.journey-item.is-active .journey-thumb {
+  border-color: rgba(140, 240, 255, 0.5);
+  color: rgba(140, 240, 255, 0.9);
+}
+
+.journey-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  min-width: 0;
+}
+
+.journey-text strong {
+  overflow: hidden;
+
+  color: #ffffff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.journey-text small {
+  color: rgba(255, 255, 255, 0.4);
+
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.journey-text em {
+  color: #7defff;
+  font-style: normal;
+
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.journey-view-all {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 16px;
+  padding: 14px 16px;
+
+  background: rgba(100, 225, 240, 0.04);
+
+  border: 1px solid rgba(124, 238, 255, 0.3);
+  border-radius: 6px;
+
+  color: white;
+
+  font-size: 9px;
+  letter-spacing: 2px;
+
+  cursor: pointer;
+
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.journey-view-all:hover {
+  background: rgba(100, 225, 240, 0.1);
+  border-color: rgba(124, 238, 255, 0.8);
+}
+
+/* =========================================
+   JOURNEY STEPPER
+========================================= */
+
+.journey-stepper {
+  position: absolute;
+
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+
+  z-index: 25;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 30px;
+
+  max-width: calc(100vw - 420px);
+
+  padding: 14px 30px;
+
+  overflow-x: auto;
+
+  background: rgba(4, 10, 16, 0.55);
+
+  border: 1px solid rgba(140, 240, 255, 0.12);
+  border-radius: 999px;
+
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.stepper-item {
+  position: relative;
+  z-index: 1;
+
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  border: 0;
+  background: none;
+
+  color: rgba(255, 255, 255, 0.4);
+
+  cursor: pointer;
+}
+
+.stepper-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 24px;
+  height: 24px;
+
+  border-radius: 50%;
+
+  background: #050d14;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+
+  color: inherit;
+
+  font-size: 9px;
+
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.stepper-label {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+
+  transition: color 0.3s;
+}
+
+.stepper-item.is-active {
+  color: #ffffff;
+}
+
+.stepper-item.is-active .stepper-dot {
+  background: #7ff7ff;
+  border-color: #7ff7ff;
+
+  color: #04141a;
+
+  box-shadow: 0 0 14px rgba(127, 247, 255, 0.7);
+}
+
+/* =========================================
+   MAP CONTROLS
+========================================= */
+
+.map-controls {
+  position: absolute;
+
+  right: 32px;
+  bottom: 92px;
+
+  /* Above the project panel so it stays reachable even
+     when the panel's bottom-right corner overlaps it. */
+  z-index: 35;
+
+  display: flex;
+  gap: 8px;
+
+  padding: 6px;
+
+  background: rgba(4, 10, 16, 0.55);
+
+  border: 1px solid rgba(140, 240, 255, 0.12);
+  border-radius: 999px;
+
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.map-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 34px;
+  height: 34px;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.75);
+
+  cursor: pointer;
+
+  transition: background 0.3s, color 0.3s;
+}
+
+.map-control-btn:hover {
+  background: rgba(140, 240, 255, 0.12);
+  color: #baffff;
+}
+
+.map-control-compass svg {
+  transition: transform 0.2s linear;
+}
+
+.map-zoom {
+  position: absolute;
+
+  right: 32px;
+  bottom: 44px;
+
+  z-index: 35;
+
+  display: flex;
+  flex-direction: column;
+
+  background: rgba(4, 10, 16, 0.55);
+
+  border: 1px solid rgba(140, 240, 255, 0.12);
+  border-radius: 10px;
+
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+
+  overflow: hidden;
+}
+
+.map-zoom button {
+  width: 34px;
+  height: 34px;
+
+  border: 0;
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.75);
+
+  font-size: 16px;
   line-height: 1;
+
+  cursor: pointer;
+
+  transition: background 0.3s, color 0.3s;
 }
 
-
-/* =====================================================
-   HIDE MAP CONTROLS
-===================================================== */
-
-.maplibregl-ctrl-top-left,
-.maplibregl-ctrl-top-right,
-.maplibregl-ctrl-bottom-left,
-.maplibregl-ctrl-bottom-right {
-  display: none !important;
+.map-zoom button:first-child {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.map-zoom button:hover {
+  background: rgba(140, 240, 255, 0.12);
+  color: #baffff;
+}
 
-/* =====================================================
+/* =========================================
    MOBILE
-===================================================== */
+========================================= */
 
-@media (max-width: 800px) {
-
+@media (max-width: 900px) {
   .world-brand {
-    left: 25px;
-    top: 30px;
-
-    font-size: 11px;
-  }
-
-  .world-menu {
-    top: 30px;
-    right: 25px;
+    left: 24px;
+    top: 28px;
   }
 
   .world-heading {
@@ -669,146 +1211,77 @@
   }
 
   .world-bottom {
-    left: 25px;
-    bottom: 30px;
+    left: 24px;
+    bottom: 28px;
   }
 
   .world-bottom h1 {
-    font-size: 28px;
-  }
-
-  .location-panel {
-    width: 100%;
-
-    padding:
-      120px
-      30px
-      35px;
-  }
-
-  .location-panel h2 {
     font-size: 34px;
   }
 
-  .location-close {
-    top: 30px;
-    right: 25px;
+  .journey-sidebar {
+    display: none;
   }
 
-  .map-instruction {
-    right: 25px;
-    bottom: 30px;
-  }
-}
-/* =========================================
-/* =====================================================
-   BRAINWING PROJECT MARKERS
-===================================================== */
+  .journey-stepper {
+    max-width: calc(100vw - 48px);
+    gap: 20px;
 
-.brainwing-project-marker {
-  position: relative;
-
-  width: 42px;
-  height: 42px;
-
-  padding: 0;
-  margin: 0;
-
-  border: none;
-  outline: none;
-
-  background: transparent;
-
-  cursor: pointer;
-
-  z-index: 9999;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  pointer-events: auto;
-}
-
-/* Outer pulse */
-
-.project-marker-pulse {
-  position: absolute;
-
-  width: 42px;
-  height: 42px;
-
-  border-radius: 50%;
-
-  background: rgba(140, 239, 245, 0.18);
-
-  animation: brainwingMarkerPulse 2s
-    ease-out infinite;
-}
-
-/* Ring */
-
-.project-marker-ring {
-  position: absolute;
-
-  width: 26px;
-  height: 26px;
-
-  border-radius: 50%;
-
-  border: 2px solid #8ceff5;
-
-  box-shadow:
-    0 0 8px rgba(140, 239, 245, 0.8),
-    0 0 20px rgba(140, 239, 245, 0.35);
-
-  background: rgba(5, 20, 30, 0.55);
-}
-
-/* Center */
-
-.project-marker-dot {
-  position: absolute;
-
-  width: 10px;
-  height: 10px;
-
-  border-radius: 50%;
-
-  background: #dfffff;
-
-  box-shadow:
-    0 0 8px #8ceff5,
-    0 0 18px #8ceff5;
-
-  z-index: 3;
-}
-
-/* Pulse animation */
-
-@keyframes brainwingMarkerPulse {
-  0% {
-    transform: scale(0.7);
-    opacity: 0.8;
+    padding: 12px 20px;
   }
 
-  70% {
-    transform: scale(1.5);
-    opacity: 0;
+  .map-controls {
+    right: 20px;
+    bottom: 84px;
   }
 
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
+  .map-zoom {
+    right: 20px;
+    bottom: 40px;
   }
-}
 
-/* Make MapTiler marker container visible */
+  .map-project-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
 
-.maplibregl-marker {
-  z-index: 9999 !important;
-}
+    width: 100%;
+    height: 62vh;
 
-.mapboxgl-marker {
-  z-index: 9999 !important;
+    padding:
+      55px
+      28px
+      30px;
+
+    border-left: 0;
+
+    border-top: 1px solid
+      rgba(130, 240, 255, 0.2);
+
+    overflow-y: auto;
+  }
+
+  .panel-close {
+    top: 18px;
+    right: 20px;
+  }
+
+  .map-project-panel h2 {
+    margin-top: 20px;
+
+    font-size: 36px;
+  }
+
+  .panel-line {
+    margin:
+      30px 0 25px;
+  }
+
+  .map-scroll-hint {
+    bottom: 25px;
+
+    font-size: 7px;
+
+    letter-spacing: 4px;
+  }
 }
