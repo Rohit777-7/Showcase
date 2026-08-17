@@ -12,7 +12,9 @@ function Home() {
       <LadyScroll />
 
       {/* PAGE 3 — 3D GLOBAL MAP */}
-      <WorldMap />
+      <div id="world-map-section">
+       <WorldMap />
+      </div>
     </main>
   );
 }
