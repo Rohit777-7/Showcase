@@ -1,4 +1,9 @@
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
 import {
   BrowserRouter,
   Routes,
@@ -11,11 +16,50 @@ import Home from "./pages/Home";
 function App() {
   const [loading, setLoading] = useState(true);
 
+  // ==========================================
+  // ALWAYS START FROM TOP ON REFRESH
+  // ==========================================
+
+  useEffect(() => {
+    // Tell browser NOT to restore previous
+    // scroll position after refresh.
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    const resetScroll = () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "instant",
+      });
+    };
+
+    // Reset immediately
+    resetScroll();
+
+    // Reset again after browser layout
+    requestAnimationFrame(() => {
+      resetScroll();
+    });
+  }, []);
+
+  // ==========================================
+  // PRELOADER COMPLETE
+  // ==========================================
+
   const handlePreloaderComplete = useCallback(() => {
     setLoading(false);
 
-    // Always start the experience from the top
-    window.scrollTo(0, 0);
+    // Make sure the main experience starts
+    // from the very beginning.
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "instant",
+      });
+    });
   }, []);
 
   return (

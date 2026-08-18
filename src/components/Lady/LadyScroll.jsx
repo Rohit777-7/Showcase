@@ -5,31 +5,53 @@ function LadyScroll() {
   const sectionRef = useRef(null);
   const videoRef = useRef(null);
   const fadeRef = useRef(null);
+
   const hasCompletedRef = useRef(false);
+  const hasReachedMapRef = useRef(false);
+  const ladyRestartedRef = useRef(false);
+
+  const lastScrollYRef = useRef(0);
+
+  const timeout1Ref = useRef(null);
+  const timeout2Ref = useRef(null);
+  const timeout3Ref = useRef(null);
 
   useEffect(() => {
     const video = videoRef.current;
+    const section = sectionRef.current;
 
-    if (!video) return;
-
-    // Start video from beginning
-    video.currentTime = 0;
+    if (!video || !section) return;
 
     // ==========================================
-    // PLAY VIDEO AUTOMATICALLY
+    // PLAY VIDEO
     // ==========================================
 
     const playVideo = async () => {
       try {
         video.playbackRate = 0.8;
+
         await video.play();
       } catch (error) {
-        console.log("Video autoplay error:", error);
+        console.log(
+          "Video autoplay error:",
+          error
+        );
       }
     };
 
     // ==========================================
-    // WHEN VIDEO COMPLETELY FINISHES
+    // INITIAL VIDEO
+    // ==========================================
+
+    const startInitialVideo = () => {
+      video.currentTime = 0;
+      video.playbackRate = 0.8;
+
+      playVideo();
+    };
+
+    // ==========================================
+    // VIDEO FINISHED
     // ==========================================
 
     const handleVideoEnd = () => {
@@ -39,17 +61,18 @@ function LadyScroll() {
 
       const fadeEl = fadeRef.current;
 
-      // Small pause after final frame, then fade to black
-      setTimeout(() => {
+      // Small pause after final frame
+      timeout1Ref.current = setTimeout(() => {
         if (fadeEl) {
           fadeEl.style.opacity = "1";
         }
 
-        // Wait for the fade-to-black to finish before jumping
-        // the scroll position, so the cut is hidden.
-        setTimeout(() => {
+        // Wait for fade
+        timeout2Ref.current = setTimeout(() => {
           const worldMap =
-            document.getElementById("world-map-section");
+            document.getElementById(
+              "world-map-section"
+            );
 
           if (worldMap) {
             worldMap.scrollIntoView({
@@ -58,8 +81,8 @@ function LadyScroll() {
             });
           }
 
-          // Fade back in once we've landed on the map section
-          setTimeout(() => {
+          // Fade back in
+          timeout3Ref.current = setTimeout(() => {
             if (fadeEl) {
               fadeEl.style.opacity = "0";
             }
@@ -68,19 +91,110 @@ function LadyScroll() {
       }, 400);
     };
 
-    video.addEventListener("ended", handleVideoEnd);
+    video.addEventListener(
+      "ended",
+      handleVideoEnd
+    );
 
     // ==========================================
-    // WAIT UNTIL VIDEO IS READY
+    // WAIT FOR VIDEO
     // ==========================================
 
     if (video.readyState >= 3) {
-      playVideo();
+      startInitialVideo();
     } else {
-      video.addEventListener("canplay", playVideo, {
-        once: true,
-      });
+      video.addEventListener(
+        "canplay",
+        startInitialVideo,
+        {
+          once: true,
+        }
+      );
     }
+
+    // ==========================================
+    // SCROLL DETECTION
+    // ==========================================
+
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      const previousY =
+        lastScrollYRef.current;
+
+      const scrollingUp =
+        currentY < previousY;
+
+      const ladyTop =
+        section.offsetTop;
+
+      const ladyBottom =
+        ladyTop + section.offsetHeight;
+
+      // ========================================
+      // USER HAS REACHED MAP
+      // ========================================
+
+      if (
+        currentY >= ladyBottom - 20
+      ) {
+        hasReachedMapRef.current = true;
+
+        // Allow restart next time we return
+        ladyRestartedRef.current = false;
+      }
+
+      // ========================================
+      // MAP → LADY
+      // ========================================
+
+      const returningToLady =
+        scrollingUp &&
+        hasReachedMapRef.current &&
+        currentY < ladyBottom - 20 &&
+        !ladyRestartedRef.current;
+
+      if (returningToLady) {
+        ladyRestartedRef.current = true;
+
+        // We are back in Lady world
+        hasReachedMapRef.current = false;
+
+        // Reset completion state
+        hasCompletedRef.current = false;
+
+        // Remove any fade
+        if (fadeRef.current) {
+          fadeRef.current.style.opacity = "0";
+        }
+
+        // ======================================
+        // RESTART LADY VIDEO
+        // ======================================
+
+        video.pause();
+
+        video.currentTime = 0;
+
+        video.playbackRate = 0.8;
+
+        playVideo();
+      }
+
+      lastScrollYRef.current =
+        currentY;
+    };
+
+    // Initial scroll position
+    lastScrollYRef.current =
+      window.scrollY;
+
+    window.addEventListener(
+      "scroll",
+      handleScroll,
+      {
+        passive: true,
+      }
+    );
 
     // ==========================================
     // CLEANUP
@@ -94,8 +208,25 @@ function LadyScroll() {
 
       video.removeEventListener(
         "canplay",
-        playVideo
+        startInitialVideo
       );
+
+      window.removeEventListener(
+        "scroll",
+        handleScroll
+      );
+
+      if (timeout1Ref.current) {
+        clearTimeout(timeout1Ref.current);
+      }
+
+      if (timeout2Ref.current) {
+        clearTimeout(timeout2Ref.current);
+      }
+
+      if (timeout3Ref.current) {
+        clearTimeout(timeout3Ref.current);
+      };
     };
   }, []);
 
@@ -127,36 +258,20 @@ function LadyScroll() {
         <div className="lady-dark-overlay" />
 
         {/* =====================================
-            YOUR EXISTING SIDE INFORMATION
+            SIDE INFORMATION
         ====================================== */}
 
         <div className="lady-side-info">
         </div>
 
         {/* =====================================
-            FADE-TO-BLACK TRANSITION OVERLAY
-            (fades in as video ends, fades out
-            once the map section is in view)
+            FADE TO BLACK
         ====================================== */}
 
         <div
           ref={fadeRef}
           className="lady-fade-out"
         />
-
-        {/* =====================================
-            YOUR EXISTING SCROLL TEXT
-        ====================================== */}
-{/* 
-        <div className="lady-scroll-text">
-          SCROLL TO EXPLORE
-
-          <div className="lady-mouse">
-            <div />
-          </div>
-
-          <div className="lady-scroll-line" />
-        </div> */}
 
       </div>
     </section>
