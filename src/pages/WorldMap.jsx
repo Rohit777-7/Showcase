@@ -46,11 +46,12 @@ const BRAINWING_HQ = {
   camera: {
     center: [72.8279, 18.9953],
 
-    zoom: 13,
+    // Close cinematic view of BrainWing / Lower Parel
+    zoom: 16.5,
 
-    pitch: 54,
+    pitch: 35,
 
-    bearing: -12,
+    bearing: 0,
   },
 };
 
@@ -135,16 +136,16 @@ function cityCameraFor(project) {
    JOURNEY SETTINGS
 ===================================================== */
 
-const DWELL = 0.6;
+const DWELL = 0;
 
 const SCROLL_VH_PER_UNIT = 90;
 
 /* =====================================================
    TERRAIN GATING
 
-   Terrain relief / 3D buildings are imperceptible at the
-   WORLDWIDE and INDIA zoom levels but still cost a full
-   GPU re-render on every jumpTo. Below this zoom they're
+   Terrain relief / 3D buildings are unnecessary at the
+   INDIA overview zoom and still cost a full GPU
+   re-render on every jumpTo. Below this zoom they're
    switched off entirely; every city stop is well above it
    (12.4+), so local hops are unaffected.
 ===================================================== */
@@ -156,12 +157,12 @@ const TERRAIN_EXAGGERATION = 1.2;
 /* =====================================================
    WAYPOINTS
 
-   IMPORTANT:
+   JOURNEY:
 
-   WORLDWIDE
+   PAGE OPENS
        ↓
-   INDIA
-       ↓
+   INDIA FULL MAP
+       ↓  FIRST SCROLL
    BRAINWING HQ / LOWER PAREL
        ↓
    BORIVALI
@@ -177,27 +178,10 @@ const TERRAIN_EXAGGERATION = 1.2;
 
 const waypoints = [
   /* ================================================
-     WORLD
-  ================================================= */
+     INDIA — INITIAL VIEW
 
-  {
-    title: "WORLDWIDE",
-
-    project: null,
-
-    camera: {
-      center: [78, 21.5],
-
-      zoom: 3.3,
-
-      pitch: 20,
-
-      bearing: 0,
-    },
-  },
-
-  /* ================================================
-     INDIA
+     The experience opens directly on India.
+     There is NO worldwide camera step.
   ================================================= */
 
   {
@@ -208,6 +192,7 @@ const waypoints = [
     camera: {
       center: [77.4, 20.2],
 
+      // Full India view
       zoom: 4.6,
 
       pitch: 30,
@@ -215,13 +200,19 @@ const waypoints = [
       bearing: -5,
     },
 
-    hop: 1.1,
+    // Initial state only — first scroll immediately moves
+    // from India to BrainWing.
+    hop: 0,
   },
 
   /* ================================================
      BRAINWING HQ
 
-     This is NOT shown in sidebar as a project.
+     India overview
+        ↓
+     BrainWing / Lower Parel
+        ↓
+     Project locations
   ================================================= */
 
   {
@@ -245,13 +236,16 @@ const waypoints = [
         BRAINWING_HQ.camera.bearing,
     },
 
-    hop: 1,
+    // First scroll: India → BrainWing.
+    hop: 1.5,
   },
 
   /* ================================================
      PROJECT LOCATIONS
 
-     Mumbai already removed.
+     Mumbai is removed from the project list.
+     BrainWing HQ is the separate Mumbai/Lower Parel
+     starting location.
   ================================================= */
 
   ...journeyProjects.map(
@@ -345,6 +339,213 @@ function straightLineCoordinatesFor(
         item.lng,
         item.lat,
       ]),
+  ];
+}
+
+
+/* =====================================================
+   PROGRESSIVE ROUTE DRAWING
+
+   The route is drawn together with the camera scroll.
+
+   progress = 0
+      → no new route
+
+   progress = 1
+      → full route to the current destination
+===================================================== */
+
+function progressiveLineCoordinates(
+  coordinates,
+  progress
+) {
+  if (
+    !Array.isArray(coordinates) ||
+    coordinates.length < 2
+  ) {
+    return [];
+  }
+
+  const p =
+    Math.max(
+      0,
+      Math.min(1, progress)
+    );
+
+  if (p <= 0) {
+    return [];
+  }
+
+  if (p >= 1) {
+    return coordinates;
+  }
+
+  const distances = [0];
+
+  let totalDistance = 0;
+
+  for (
+    let i = 1;
+    i < coordinates.length;
+    i++
+  ) {
+    const [x1, y1] =
+      coordinates[i - 1];
+
+    const [x2, y2] =
+      coordinates[i];
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    totalDistance +=
+      Math.sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+    distances.push(
+      totalDistance
+    );
+  }
+
+  if (totalDistance <= 0) {
+    return coordinates.slice(
+      0,
+      2
+    );
+  }
+
+  const targetDistance =
+    totalDistance * p;
+
+  const result = [
+    coordinates[0],
+  ];
+
+  for (
+    let i = 1;
+    i < coordinates.length;
+    i++
+  ) {
+    if (
+      distances[i] <
+      targetDistance
+    ) {
+      result.push(
+        coordinates[i]
+      );
+
+      continue;
+    }
+
+    const previousDistance =
+      distances[i - 1];
+
+    const segmentDistance =
+      distances[i] -
+      previousDistance;
+
+    const localProgress =
+      segmentDistance > 0
+        ? (
+            targetDistance -
+            previousDistance
+          ) /
+          segmentDistance
+        : 0;
+
+    const [x1, y1] =
+      coordinates[i - 1];
+
+    const [x2, y2] =
+      coordinates[i];
+
+    result.push([
+      x1 +
+        (x2 - x1) *
+          localProgress,
+
+      y1 +
+        (y2 - y1) *
+          localProgress,
+    ]);
+
+    break;
+  }
+
+  return result;
+}
+
+
+function progressiveRouteFromPrevious(
+  coordinates,
+  previousPoint,
+  progress
+) {
+  if (
+    !Array.isArray(coordinates) ||
+    coordinates.length < 2 ||
+    !previousPoint
+  ) {
+    return [];
+  }
+
+  let nearestIndex = 0;
+  let nearestDistance = Infinity;
+
+  coordinates.forEach(
+    (coordinate, index) => {
+      const dx =
+        coordinate[0] -
+        previousPoint[0];
+
+      const dy =
+        coordinate[1] -
+        previousPoint[1];
+
+      const distance =
+        dx * dx + dy * dy;
+
+      if (
+        distance <
+        nearestDistance
+      ) {
+        nearestDistance =
+          distance;
+
+        nearestIndex =
+          index;
+      }
+    }
+  );
+
+  const completed =
+    coordinates.slice(
+      0,
+      nearestIndex + 1
+    );
+
+  const currentSegment =
+    coordinates.slice(
+      nearestIndex
+    );
+
+  const partial =
+    progressiveLineCoordinates(
+      currentSegment,
+      progress
+    );
+
+  if (
+    partial.length <= 1
+  ) {
+    return completed;
+  }
+
+  return [
+    ...completed,
+    ...partial.slice(1),
   ];
 }
 
@@ -637,6 +838,12 @@ function WorldMap() {
   const routeRequestIdRef =
     useRef(0);
 
+  // Keeps the best available route geometry for each project.
+  // Starts with straight coordinates and upgrades to road
+  // geometry when MapTiler routing resolves.
+  const routeGeometryRef =
+    useRef(new Map());
+
   const stickyRef =
     useRef(null);
 
@@ -719,10 +926,18 @@ function WorldMap() {
         return;
       }
 
-      setActiveRoute(
+      const fallbackRoute =
         straightLineCoordinatesFor(
           project
-        )
+        );
+
+      routeGeometryRef.current.set(
+        project.id,
+        fallbackRoute
+      );
+
+      setActiveRoute(
+        fallbackRoute
       );
 
       roadRouteCoordinatesFor(
@@ -736,6 +951,11 @@ function WorldMap() {
         ) {
           return;
         }
+
+        routeGeometryRef.current.set(
+          project.id,
+          coordinates
+        );
 
         setActiveRoute(
           coordinates
@@ -805,10 +1025,27 @@ function WorldMap() {
         );
       }
 
-      applyRoute(
-        fromWaypoint.project
-      );
-    }, [applyRoute, setActiveMarker]);
+      // Keep the route that has already been completed.
+      // Do not wait for the next destination to be reached.
+      if (fromWaypoint.project) {
+        const route =
+          routeGeometryRef.current.get(
+            fromWaypoint.project.id
+          );
+
+        if (route) {
+          setActiveRoute(
+            route
+          );
+        } else {
+          applyRoute(
+            fromWaypoint.project
+          );
+        }
+      } else {
+        setActiveRoute([]);
+      }
+    }, [applyRoute, setActiveMarker, setActiveRoute]);
 
   /* =====================================================
      SYNC JOURNEY STATE
@@ -1058,12 +1295,72 @@ function WorldMap() {
         waypoints.length;
         i++
       ) {
+        const waypoint =
+          waypoints[i];
+
         const hopLength =
-          waypoints[i].hop ??
+          waypoint.hop ??
           1;
 
         const target =
-          waypoints[i].camera;
+          waypoint.camera;
+
+        /*
+         * INDIA → BRAINWING
+         *
+         * No project route is drawn here.
+         * BrainWing is the fixed HQ.
+         */
+        const isProjectWaypoint =
+          Boolean(
+            waypoint.project
+          );
+
+        const targetProject =
+          waypoint.project;
+
+        /*
+         * Start with the straight fallback immediately.
+         * If the routing request resolves later, the same
+         * scroll animation will automatically use the road
+         * geometry from that point onward.
+         */
+        let routeCoordinates =
+          targetProject
+            ? (
+                routeGeometryRef.current.get(
+                  targetProject.id
+                ) ??
+                straightLineCoordinatesFor(
+                  targetProject
+                )
+              )
+            : [];
+
+        if (
+          targetProject &&
+          !routeGeometryRef.current.has(
+            targetProject.id
+          )
+        ) {
+          routeGeometryRef.current.set(
+            targetProject.id,
+            routeCoordinates
+          );
+
+          roadRouteCoordinatesFor(
+            targetProject,
+            maptilersdk.config.apiKey
+          ).then((coordinates) => {
+            routeGeometryRef.current.set(
+              targetProject.id,
+              coordinates
+            );
+          });
+        }
+
+        const segmentStart =
+          cursor;
 
         tl.to(
           proxy,
@@ -1090,7 +1387,73 @@ function WorldMap() {
               "power1.inOut",
 
             onUpdate:
-              syncCamera,
+              () => {
+                syncCamera();
+
+                /*
+                 * Draw the connecting route at the same
+                 * progress as the camera.
+                 *
+                 * India → BrainWing:
+                 * no route because BrainWing is the HQ.
+                 *
+                 * BrainWing → Borivali:
+                 * route grows from 0 → full.
+                 *
+                 * Borivali → Thane:
+                 * completed Borivali route stays visible
+                 * while the route extends toward Thane.
+                 */
+                if (
+                  isProjectWaypoint &&
+                  targetProject
+                ) {
+                  const progress =
+                    hopLength > 0
+                      ? Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            (
+                              tl.time() -
+                              segmentStart
+                            ) /
+                              hopLength
+                          )
+                        )
+                      : 1;
+
+                  const latestRoute =
+                    routeGeometryRef.current.get(
+                      targetProject.id
+                    ) ??
+                    routeCoordinates;
+
+                  const previousWaypoint =
+                    waypoints[i - 1];
+
+                  const previousPoint =
+                    previousWaypoint.project
+                      ? [
+                          previousWaypoint.project.lng,
+                          previousWaypoint.project.lat,
+                        ]
+                      : [
+                          BRAINWING_HQ.lng,
+                          BRAINWING_HQ.lat,
+                        ];
+
+                  setActiveRoute(
+                    progressiveRouteFromPrevious(
+                      latestRoute,
+                      previousPoint,
+                      progress
+                    )
+                  );
+                } else {
+                  setActiveRoute([]);
+                }
+              },
           },
 
           cursor
@@ -1100,8 +1463,7 @@ function WorldMap() {
           hopLength;
 
         breakpoints.push({
-          waypoint:
-            waypoints[i],
+          waypoint,
 
           arrive:
             cursor,
@@ -1255,7 +1617,7 @@ function WorldMap() {
           false,
 
         // Terrain starts disabled — the initial camera
-        // (waypoints[0], zoom 3.3) is well below
+        // (waypoints[0], zoom 4.6) is below
         // TERRAIN_MIN_ZOOM, and syncCamera() enables it
         // once scroll brings zoom into city range.
       });
