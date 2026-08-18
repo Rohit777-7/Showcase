@@ -1,29 +1,82 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import * as maptilersdk from "@maptiler/sdk";
+
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+
 import "@maptiler/sdk/dist/maptiler-sdk.css";
 
 import { projects } from "../data/projects";
+
 import LocationPanel from "../components/world/LocationPanel";
 import JourneySidebar from "../components/world/JourneySidebar";
 import JourneyStepper from "../components/world/JourneyStepper";
+
 import "../styles/world-map.css";
 
 gsap.registerPlugin(ScrollTrigger);
+
+/* =====================================================
+   BRAINWING HQ
+
+   This is NOT a project.
+
+   It is the fixed starting location of the company.
+   Lower Parel, Mumbai.
+===================================================== */
+
+const BRAINWING_HQ = {
+  id: "brainwing-hq",
+
+  title: "BRAINWING",
+
+  city: "LOWER PAREL",
+
+  country: "INDIA",
+
+  lng: 72.8279,
+  lat: 18.9953,
+
+  camera: {
+    center: [72.8279, 18.9953],
+
+    zoom: 13,
+
+    pitch: 54,
+
+    bearing: -12,
+  },
+};
+
+/* =====================================================
+   REMOVE MUMBAI FROM PROJECT LOCATIONS
+
+   Mumbai is no longer a project location.
+
+   BrainWing HQ / Lower Parel is represented separately.
+===================================================== */
+
+const journeyProjects = projects.filter(
+  (project) => {
+    const city =
+      project.city
+        ?.trim()
+        .toLowerCase();
+
+    return city !== "mumbai";
+  }
+);
 
 /* =====================================================
    CAMERA SETTINGS
 ===================================================== */
 
 const CITY_CAMERA = {
-  mumbai: {
-    zoom: 12.6,
-    pitch: 55,
-    bearing: -18,
-    hop: 1.1,
-  },
-
   borivali: {
     zoom: 13.4,
     pitch: 58,
@@ -62,14 +115,24 @@ const CITY_CAMERA = {
 
 const DEFAULT_CITY_CAMERA = {
   zoom: 13.2,
+
   pitch: 56,
+
   bearing: -18,
+
   hop: 1,
 };
 
 function cityCameraFor(project) {
-  return CITY_CAMERA[project.id] ?? DEFAULT_CITY_CAMERA;
+  return (
+    CITY_CAMERA[project.id] ??
+    DEFAULT_CITY_CAMERA
+  );
 }
+
+/* =====================================================
+   JOURNEY SETTINGS
+===================================================== */
 
 const DWELL = 0.6;
 
@@ -79,51 +142,135 @@ const SCROLL_VH_PER_UNIT = 90;
    WAYPOINTS
 
    IMPORTANT:
-   Locations come ONLY from projects.js.
+
+   WORLDWIDE
+       ↓
+   INDIA
+       ↓
+   BRAINWING HQ / LOWER PAREL
+       ↓
+   BORIVALI
+       ↓
+   THANE
+       ↓
+   COLABA
+       ↓
+   BANGALORE
+       ↓
+   LONDON
 ===================================================== */
 
 const waypoints = [
+  /* ================================================
+     WORLD
+  ================================================= */
+
   {
     title: "WORLDWIDE",
+
     project: null,
+
     camera: {
       center: [78, 21.5],
+
       zoom: 3.3,
+
       pitch: 20,
+
       bearing: 0,
     },
   },
 
+  /* ================================================
+     INDIA
+  ================================================= */
+
   {
     title: "INDIA",
+
     project: null,
+
     camera: {
       center: [77.4, 20.2],
+
       zoom: 4.6,
+
       pitch: 30,
+
       bearing: -5,
     },
+
     hop: 1.1,
   },
 
-  ...projects.map((project) => {
-    const cam = cityCameraFor(project);
+  /* ================================================
+     BRAINWING HQ
 
-    return {
-      title: project.city.toUpperCase(),
+     This is NOT shown in sidebar as a project.
+  ================================================= */
 
-      project,
+  {
+    title: "BRAINWING",
 
-      camera: {
-        center: [project.lng, project.lat],
-        zoom: cam.zoom,
-        pitch: cam.pitch,
-        bearing: cam.bearing,
-      },
+    project: null,
 
-      hop: cam.hop,
-    };
-  }),
+    hq: true,
+
+    camera: {
+      center:
+        BRAINWING_HQ.camera.center,
+
+      zoom:
+        BRAINWING_HQ.camera.zoom,
+
+      pitch:
+        BRAINWING_HQ.camera.pitch,
+
+      bearing:
+        BRAINWING_HQ.camera.bearing,
+    },
+
+    hop: 1,
+  },
+
+  /* ================================================
+     PROJECT LOCATIONS
+
+     Mumbai already removed.
+  ================================================= */
+
+  ...journeyProjects.map(
+    (project) => {
+      const cam =
+        cityCameraFor(project);
+
+      return {
+        title:
+          project.city.toUpperCase(),
+
+        project,
+
+        camera: {
+          center: [
+            project.lng,
+            project.lat,
+          ],
+
+          zoom:
+            cam.zoom,
+
+          pitch:
+            cam.pitch,
+
+          bearing:
+            cam.bearing,
+        },
+
+        hop:
+          cam.hop,
+      };
+    }
+  ),
 ];
 
 /* =====================================================
@@ -136,6 +283,7 @@ function emptyLineFeature() {
 
     geometry: {
       type: "LineString",
+
       coordinates: [],
     },
   };
@@ -144,29 +292,42 @@ function emptyLineFeature() {
 /* =====================================================
    HIDE MAPTILER LABELS
 
-   We keep only Brainwing's own markers.
+   We keep BrainWing's own markers.
 ===================================================== */
 
 function cleanMapLabels(map) {
   const hide = () => {
-    const layers = map.getStyle()?.layers ?? [];
+    const layers =
+      map.getStyle()?.layers ?? [];
 
     layers.forEach((layer) => {
-      if (layer.type !== "symbol") return;
+      if (
+        layer.type !== "symbol"
+      ) {
+        return;
+      }
 
       try {
-        map.setLayoutProperty(layer.id, "visibility", "none");
+        map.setLayoutProperty(
+          layer.id,
+          "visibility",
+          "none"
+        );
       } catch (_) {}
     });
   };
 
-  // Hide immediately.
   hide();
 
-  // MapTiler can re-apply style layers while the style settles.
-  // Hide them again after the map becomes idle.
-  map.once("idle", hide);
-  setTimeout(hide, 500);
+  map.once(
+    "idle",
+    hide
+  );
+
+  setTimeout(
+    hide,
+    500
+  );
 }
 
 /* =====================================================
@@ -174,28 +335,43 @@ function cleanMapLabels(map) {
 ===================================================== */
 
 function addRealisticBuildings(map) {
-  const existingBuildingLayer = map
-    .getStyle()
-    ?.layers
-    ?.find(
-      (layer) =>
-        layer["source-layer"] === "building"
-    );
+  const existingBuildingLayer =
+    map
+      .getStyle()
+      ?.layers
+      ?.find(
+        (layer) =>
+          layer[
+            "source-layer"
+          ] === "building"
+      );
 
-  if (!existingBuildingLayer) return;
+  if (
+    !existingBuildingLayer
+  ) {
+    return;
+  }
 
-  if (map.getLayer("brainwing-3d-buildings")) {
+  if (
+    map.getLayer(
+      "brainwing-3d-buildings"
+    )
+  ) {
     return;
   }
 
   map.addLayer({
-    id: "brainwing-3d-buildings",
+    id:
+      "brainwing-3d-buildings",
 
-    type: "fill-extrusion",
+    type:
+      "fill-extrusion",
 
-    source: existingBuildingLayer.source,
+    source:
+      existingBuildingLayer.source,
 
-    "source-layer": "building",
+    "source-layer":
+      "building",
 
     minzoom: 13,
 
@@ -232,12 +408,21 @@ function addRealisticBuildings(map) {
 
       "fill-extrusion-base": [
         "coalesce",
-        ["get", "render_min_height"],
-        ["get", "min_height"],
+        [
+          "get",
+          "render_min_height",
+        ],
+
+        [
+          "get",
+          "min_height",
+        ],
+
         0,
       ],
 
-      "fill-extrusion-opacity": 0.92,
+      "fill-extrusion-opacity":
+        0.92,
     },
   });
 }
@@ -247,439 +432,523 @@ function addRealisticBuildings(map) {
 ===================================================== */
 
 function WorldMap() {
-  const storyRef = useRef(null);
+  const storyRef =
+    useRef(null);
 
-  const mapContainerRef = useRef(null);
+  const mapContainerRef =
+    useRef(null);
 
-  const compassNeedleRef = useRef(null);
+  const compassNeedleRef =
+    useRef(null);
 
-  const mapRef = useRef(null);
+  const mapRef =
+    useRef(null);
 
-  const markersRef = useRef([]);
+  const markersRef =
+    useRef([]);
 
-  const markerElsRef = useRef({});
+  const markerElsRef =
+    useRef({});
 
-  const timelineRef = useRef(null);
+  const timelineRef =
+    useRef(null);
 
-  const breakpointsRef = useRef([]);
+  const breakpointsRef =
+    useRef([]);
 
-  const cameraProxyRef = useRef({
-    ...waypoints[0].camera,
-  });
+  const cameraProxyRef =
+    useRef({
+      ...waypoints[0].camera,
+    });
 
-  const activeIdRef = useRef(null);
+  const activeIdRef =
+    useRef(null);
 
   const [activeProject, setActiveProject] =
     useState(null);
 
   /* =====================================================
-     ACTIVE ROUTE
+     ROUTE STOPS
 
-     This route ALWAYS contains ONLY actual projects.js
-     coordinates.
+     HQ is always the first point.
 
-     NEVER add camera coordinates here.
+     Then all project locations.
+
+     Example:
+
+     HQ
+      ↓
+     Borivali
+      ↓
+     Thane
+      ↓
+     Colaba
+      ↓
+     Bangalore
+      ↓
+     London
   ===================================================== */
 
-  const setActiveRoute = (coordinates) => {
-    const source =
-      mapRef.current?.getSource(
-        "brainwing-route-active"
-      );
+  const routeStops = [
+    BRAINWING_HQ,
+    ...journeyProjects,
+  ];
 
-    if (!source) return;
+  /* =====================================================
+     CREATE ROUTE COORDINATES
 
-    source.setData({
-      type: "Feature",
+     ONLY real locations.
 
-      geometry: {
-        type: "LineString",
-        coordinates,
-      },
-    });
-  };
+     NEVER camera coordinates.
+  ===================================================== */
+
+  const coordinatesForProject =
+    (project) => {
+      const index =
+        journeyProjects.findIndex(
+          (item) =>
+            item.id ===
+            project.id
+        );
+
+      if (index < 0) {
+        return [];
+      }
+
+      return [
+        [
+          BRAINWING_HQ.lng,
+          BRAINWING_HQ.lat,
+        ],
+
+        ...journeyProjects
+          .slice(
+            0,
+            index + 1
+          )
+          .map(
+            (item) => [
+              item.lng,
+              item.lat,
+            ]
+          ),
+      ];
+    };
+
+  /* =====================================================
+     SET ACTIVE ROUTE
+  ===================================================== */
+
+  const setActiveRoute =
+    (coordinates) => {
+      const source =
+        mapRef.current?.getSource(
+          "brainwing-route-active"
+        );
+
+      if (!source) {
+        return;
+      }
+
+      source.setData({
+        type: "Feature",
+
+        geometry: {
+          type: "LineString",
+
+          coordinates,
+        },
+      });
+    };
 
   /* =====================================================
      ACTIVE MARKER
   ===================================================== */
 
-  const setActiveMarker = (id) => {
-    Object.entries(
-      markerElsRef.current
-    ).forEach(([projectId, element]) => {
-      element.classList.toggle(
-        "is-active",
-        projectId === id
+  const setActiveMarker =
+    (id) => {
+      Object.entries(
+        markerElsRef.current
+      ).forEach(
+        ([
+          projectId,
+          element,
+        ]) => {
+          element.classList.toggle(
+            "is-active",
+            projectId === id
+          );
+        }
       );
-    });
-  };
+    };
 
   /* =====================================================
-     WHEN ARRIVING AT A PROJECT
+     ENTER PROJECT
 
-     Example:
+     When scroll reaches a project:
 
-     Mumbai
-     Mumbai → Borivali
-     Mumbai → Borivali → Thane
-     etc.
+     HQ → current project
+
+     route becomes visible.
   ===================================================== */
 
-  const enterWaypoint = (waypoint) => {
-    const id =
-      waypoint.project?.id ?? null;
+  const enterWaypoint =
+    (waypoint) => {
+      const id =
+        waypoint.project?.id ??
+        null;
 
-    if (activeIdRef.current !== id) {
-      activeIdRef.current = id;
+      if (
+        activeIdRef.current !==
+        id
+      ) {
+        activeIdRef.current =
+          id;
 
-      setActiveProject(
-        waypoint.project
+        setActiveProject(
+          waypoint.project
+        );
+
+        setActiveMarker(id);
+      }
+
+      if (
+        !waypoint.project
+      ) {
+        setActiveRoute(
+          []
+        );
+
+        return;
+      }
+
+      const routeCoordinates =
+        coordinatesForProject(
+          waypoint.project
+        );
+
+      setActiveRoute(
+        routeCoordinates
       );
-
-      setActiveMarker(id);
-    }
-
-    if (!waypoint.project) {
-      setActiveRoute([]);
-      return;
-    }
-
-    const projectIndex =
-      projects.findIndex(
-        (project) =>
-          project.id ===
-          waypoint.project.id
-      );
-
-    if (projectIndex < 0) {
-      setActiveRoute([]);
-      return;
-    }
-
-    const routeCoordinates =
-      projects
-        .slice(
-          0,
-          projectIndex + 1
-        )
-        .map((project) => [
-          project.lng,
-          project.lat,
-        ]);
-
-    setActiveRoute(
-      routeCoordinates
-    );
-  };
+    };
 
   /* =====================================================
      DURING CAMERA TRANSITION
 
      IMPORTANT:
-     We DO NOT add cameraProxyRef.current here.
 
-     This was causing the unwanted extra route lines.
+     Never add camera coordinates
+     to route.
   ===================================================== */
 
-  const transitFrom = (fromWaypoint) => {
-    if (
-      activeIdRef.current !== null
-    ) {
-      activeIdRef.current = null;
+  const transitFrom =
+    (fromWaypoint) => {
+      if (
+        activeIdRef.current !==
+        null
+      ) {
+        activeIdRef.current =
+          null;
 
-      setActiveProject(null);
+        setActiveProject(
+          null
+        );
 
-      setActiveMarker(null);
-    }
+        setActiveMarker(
+          null
+        );
+      }
 
-    if (!fromWaypoint.project) {
-      setActiveRoute([]);
-      return;
-    }
+      if (
+        !fromWaypoint.project
+      ) {
+        setActiveRoute(
+          []
+        );
 
-    const projectIndex =
-      projects.findIndex(
-        (project) =>
-          project.id ===
-          fromWaypoint.project.id
+        return;
+      }
+
+      const routeCoordinates =
+        coordinatesForProject(
+          fromWaypoint.project
+        );
+
+      setActiveRoute(
+        routeCoordinates
       );
-
-    if (projectIndex < 0) {
-      setActiveRoute([]);
-      return;
-    }
-
-    const priorCoordinates =
-      projects
-        .slice(
-          0,
-          projectIndex + 1
-        )
-        .map((project) => [
-          project.lng,
-          project.lat,
-        ]);
-
-    /*
-      IMPORTANT:
-
-      NO camera coordinate here.
-
-      WRONG:
-
-      [...priorCoordinates, [
-        camera.lng,
-        camera.lat
-      ]]
-
-      That was creating the unwanted
-      diagonal/extra lines.
-    */
-
-    setActiveRoute(
-      priorCoordinates
-    );
-  };
+    };
 
   /* =====================================================
      SYNC JOURNEY STATE
   ===================================================== */
 
-  const syncJourneyState = (time) => {
-    const breakpoints =
-      breakpointsRef.current;
-
-    if (!breakpoints.length) return;
-
-    for (
-      let k = 0;
-      k < breakpoints.length;
-      k++
-    ) {
-      const bp =
-        breakpoints[k];
-
-      const isLast =
-        k ===
-        breakpoints.length - 1;
+  const syncJourneyState =
+    (time) => {
+      const breakpoints =
+        breakpointsRef.current;
 
       if (
-        time >= bp.arrive &&
-        (isLast ||
-          time < bp.leave)
+        !breakpoints.length
       ) {
-        enterWaypoint(
-          bp.waypoint
-        );
-
         return;
       }
-    }
 
-    for (
-      let k = 0;
-      k <
-      breakpoints.length - 1;
-      k++
-    ) {
-      if (
-        time >=
-          breakpoints[k].leave &&
-        time <
-          breakpoints[k + 1]
-            .arrive
+      /* ================================================
+         PROJECT ARRIVAL
+      ================================================= */
+
+      for (
+        let k = 0;
+        k <
+        breakpoints.length;
+        k++
       ) {
-        transitFrom(
-          breakpoints[k]
-            .waypoint
-        );
+        const bp =
+          breakpoints[k];
 
-        return;
+        const isLast =
+          k ===
+          breakpoints.length -
+            1;
+
+        if (
+          time >= bp.arrive &&
+          (
+            isLast ||
+            time < bp.leave
+          )
+        ) {
+          enterWaypoint(
+            bp.waypoint
+          );
+
+          return;
+        }
       }
-    }
-  };
+
+      /* ================================================
+         BETWEEN PROJECTS
+      ================================================= */
+
+      for (
+        let k = 0;
+        k <
+        breakpoints.length -
+          1;
+        k++
+      ) {
+        if (
+          time >=
+            breakpoints[k]
+              .leave &&
+          time <
+            breakpoints[
+              k + 1
+            ].arrive
+        ) {
+          transitFrom(
+            breakpoints[k]
+              .waypoint
+          );
+
+          return;
+        }
+      }
+    };
 
   /* =====================================================
      BUILD CAMERA TIMELINE
   ===================================================== */
 
-  const buildJourneyTimeline = (
-    map
-  ) => {
-    const proxy =
-      cameraProxyRef.current;
+  const buildJourneyTimeline =
+    (map) => {
+      const proxy =
+        cameraProxyRef.current;
 
-    const breakpoints = [
-      {
-        waypoint:
-          waypoints[0],
-
-        arrive: 0,
-
-        leave: DWELL,
-      },
-    ];
-
-    const syncCamera = () => {
-      map.jumpTo({
-        center: [
-          proxy.lng,
-          proxy.lat,
-        ],
-
-        zoom: proxy.zoom,
-
-        pitch: proxy.pitch,
-
-        bearing:
-          proxy.bearing,
-      });
-
-      if (
-        compassNeedleRef.current
-      ) {
-        compassNeedleRef.current.style.transform =
-          `rotate(${-proxy.bearing}deg)`;
-      }
-    };
-
-    const tl =
-      gsap.timeline({
-        scrollTrigger: {
-          trigger:
-            storyRef.current,
-
-          start: "top top",
-
-          end: "bottom bottom",
-
-          scrub: 0.7,
-
-          onUpdate: () =>
-            syncJourneyState(
-              tl.time()
-            ),
-        },
-      });
-
-    let cursor = DWELL;
-
-    for (
-      let i = 1;
-      i < waypoints.length;
-      i++
-    ) {
-      const hopLength =
-        waypoints[i].hop ??
-        1;
-
-      const target =
-        waypoints[i].camera;
-
-      tl.to(
-        proxy,
+      const breakpoints = [
         {
-          lng:
-            target.center[0],
+          waypoint:
+            waypoints[0],
 
-          lat:
-            target.center[1],
+          arrive: 0,
 
-          zoom:
-            target.zoom,
-
-          pitch:
-            target.pitch,
-
-          bearing:
-            target.bearing,
-
-          duration:
-            hopLength,
-
-          ease:
-            "power1.inOut",
-
-          onUpdate:
-            syncCamera,
+          leave: DWELL,
         },
+      ];
 
-        cursor
-      );
+      const syncCamera =
+        () => {
+          map.jumpTo({
+            center: [
+              proxy.lng,
+              proxy.lat,
+            ],
 
-      cursor +=
-        hopLength;
+            zoom:
+              proxy.zoom,
 
-      breakpoints.push({
-        waypoint:
-          waypoints[i],
+            pitch:
+              proxy.pitch,
 
-        arrive:
-          cursor,
+            bearing:
+              proxy.bearing,
+          });
 
-        leave:
-          cursor + DWELL,
-      });
+          if (
+            compassNeedleRef.current
+          ) {
+            compassNeedleRef.current.style.transform =
+              `rotate(${-proxy.bearing}deg)`;
+          }
+        };
 
-      cursor += DWELL;
-    }
+      const tl =
+        gsap.timeline({
+          scrollTrigger: {
+            trigger:
+              storyRef.current,
 
-    timelineRef.current =
-      tl;
+            start:
+              "top top",
 
-    breakpointsRef.current =
-      breakpoints;
+            end:
+              "bottom bottom",
 
-    syncJourneyState(0);
-  };
+            scrub: 0.7,
+
+            onUpdate:
+              () =>
+                syncJourneyState(
+                  tl.time()
+                ),
+          },
+        });
+
+      let cursor =
+        DWELL;
+
+      /* ================================================
+         CAMERA JOURNEY
+      ================================================= */
+
+      for (
+        let i = 1;
+        i <
+        waypoints.length;
+        i++
+      ) {
+        const hopLength =
+          waypoints[i].hop ??
+          1;
+
+        const target =
+          waypoints[i].camera;
+
+        tl.to(
+          proxy,
+          {
+            lng:
+              target.center[0],
+
+            lat:
+              target.center[1],
+
+            zoom:
+              target.zoom,
+
+            pitch:
+              target.pitch,
+
+            bearing:
+              target.bearing,
+
+            duration:
+              hopLength,
+
+            ease:
+              "power1.inOut",
+
+            onUpdate:
+              syncCamera,
+          },
+
+          cursor
+        );
+
+        cursor +=
+          hopLength;
+
+        breakpoints.push({
+          waypoint:
+            waypoints[i],
+
+          arrive:
+            cursor,
+
+          leave:
+            cursor + DWELL,
+        });
+
+        cursor +=
+          DWELL;
+      }
+
+      timelineRef.current =
+        tl;
+
+      breakpointsRef.current =
+        breakpoints;
+
+      syncJourneyState(0);
+    };
 
   /* =====================================================
      SCROLL TO PROJECT
   ===================================================== */
 
-  const scrollToProject = (
-    project
-  ) => {
-    const tl =
-      timelineRef.current;
+  const scrollToProject =
+    (project) => {
+      const tl =
+        timelineRef.current;
 
-    const storyEl =
-      storyRef.current;
+      const storyEl =
+        storyRef.current;
 
-    const breakpoint =
-      breakpointsRef.current.find(
-        (bp) =>
-          bp.waypoint.project
-            ?.id ===
-          project.id
-      );
+      const breakpoint =
+        breakpointsRef.current.find(
+          (bp) =>
+            bp.waypoint.project
+              ?.id ===
+            project.id
+        );
 
-    if (
-      !tl ||
-      !storyEl ||
-      !breakpoint
-    ) {
-      return;
-    }
+      if (
+        !tl ||
+        !storyEl ||
+        !breakpoint
+      ) {
+        return;
+      }
 
-    const fraction =
-      breakpoint.arrive /
-      tl.duration();
+      const fraction =
+        breakpoint.arrive /
+        tl.duration();
 
-    const scrollRange =
-      storyEl.offsetHeight -
-      window.innerHeight;
+      const scrollRange =
+        storyEl.offsetHeight -
+        window.innerHeight;
 
-    window.scrollTo({
-      top:
-        storyEl.offsetTop +
-        fraction *
-          scrollRange,
+      window.scrollTo({
+        top:
+          storyEl.offsetTop +
+          fraction *
+            scrollRange,
 
-      behavior:
-        "smooth",
-    });
-  };
+        behavior:
+          "smooth",
+      });
+    };
 
   /* =====================================================
      INITIALIZE MAP
@@ -692,7 +961,9 @@ function WorldMap() {
       return;
     }
 
-    if (mapRef.current) {
+    if (
+      mapRef.current
+    ) {
       return;
     }
 
@@ -711,13 +982,18 @@ function WorldMap() {
     maptilersdk.config.apiKey =
       apiKey;
 
+    /* ================================================
+       MAP
+    ================================================= */
+
     const map =
       new maptilersdk.Map({
         container:
           mapContainerRef.current,
 
         style:
-          maptilersdk.MapStyle.STREETS.DARK,
+          maptilersdk.MapStyle
+            .STREETS.DARK,
 
         center:
           waypoints[0]
@@ -735,7 +1011,8 @@ function WorldMap() {
           waypoints[0]
             .camera.bearing,
 
-        maxPitch: 68,
+        maxPitch:
+          68,
 
         navigationControl:
           false,
@@ -743,18 +1020,22 @@ function WorldMap() {
         geolocateControl:
           false,
 
-        attributionControl: {
-          compact: true,
-        },
+        attributionControl:
+          {
+            compact: true,
+          },
 
-        dragRotate: true,
+        dragRotate:
+          true,
 
         touchZoomRotate:
           true,
 
-        scrollZoom: false,
+        scrollZoom:
+          false,
 
-        terrain: true,
+        terrain:
+          true,
 
         terrainExaggeration:
           1.2,
@@ -770,28 +1051,25 @@ function WorldMap() {
     map.on(
       "load",
       () => {
-        /* =============================================
-           REMOVE NATIVE MAP LABELS
-        ============================================= */
+        /* ==============================================
+           REMOVE MAP LABELS
+        ============================================== */
 
         cleanMapLabels(
           map
         );
 
-        /* =============================================
+        /* ==============================================
            3D BUILDINGS
-        ============================================= */
+        ============================================== */
 
         addRealisticBuildings(
           map
         );
-        /* =============================================
-           ACTIVE ROUTE
 
-           ONLY the route generated from projects.js is used.
-           There is NO second full-route layer, so no duplicate
-           line is drawn underneath the active route.
-        ============================================= */
+        /* ==============================================
+           ROUTE SOURCE
+        ============================================== */
 
         map.addSource(
           "brainwing-route-active",
@@ -804,9 +1082,9 @@ function WorldMap() {
           }
         );
 
-        /* =============================================
-           ACTIVE ROUTE GLOW
-        ============================================= */
+        /* ==============================================
+           ROUTE GLOW
+        ============================================== */
 
         map.addLayer({
           id:
@@ -831,19 +1109,19 @@ function WorldMap() {
               "#69f4ff",
 
             "line-width":
-              8,
+              10,
 
             "line-opacity":
-              0.16,
+              0.18,
 
             "line-blur":
               3,
           },
         });
 
-        /* =============================================
-           ACTIVE ROUTE CORE
-        ============================================= */
+        /* ==============================================
+           ROUTE CORE
+        ============================================== */
 
         map.addLayer({
           id:
@@ -868,20 +1146,95 @@ function WorldMap() {
               "#d8ffff",
 
             "line-width":
-              2.5,
+              3,
 
             "line-opacity":
-              0.9,
+              0.95,
+
+            "line-dasharray":
+              [
+                1,
+                1.8,
+              ],
           },
         });
 
-        /* =============================================
+        /* ==============================================
+           BRAINWING HQ MARKER
+        ============================================== */
+
+        const hqElement =
+          document.createElement(
+            "button"
+          );
+
+        hqElement.className =
+          "brainwing-hq-marker";
+
+        hqElement.type =
+          "button";
+
+        hqElement.innerHTML = `
+          <span class="hq-pulse"></span>
+
+          <span class="hq-core">
+            <span class="hq-logo-dot">
+              B
+            </span>
+          </span>
+
+          <span class="hq-label">
+            <strong>
+              BRAINWING
+            </strong>
+
+            <small>
+              LOWER PAREL
+            </small>
+          </span>
+        `;
+
+        hqElement.setAttribute(
+          "aria-label",
+          "BrainWing Lower Parel"
+        );
+
+        hqElement.style.zIndex =
+          "1000";
+
+        hqElement.style.pointerEvents =
+          "auto";
+
+        const hqMarker =
+          new maptilersdk.Marker({
+            element:
+              hqElement,
+
+            anchor:
+              "center",
+          })
+            .setLngLat([
+              BRAINWING_HQ.lng,
+              BRAINWING_HQ.lat,
+            ])
+            .addTo(map);
+
+        markersRef.current.push(
+          hqMarker
+        );
+
+        /* ==============================================
            PROJECT MARKERS
 
-           ONLY locations from projects.js.
-        ============================================= */
+           IMPORTANT:
 
-        projects.forEach(
+           journeyProjects is used,
+           NOT projects.
+
+           Therefore Mumbai is gone.
+        ============================================== */
+
+        journeyProjects.forEach(
           (
             project,
             index
@@ -922,7 +1275,7 @@ function WorldMap() {
             );
 
             markerElement.style.zIndex =
-              "20";
+              "900";
 
             markerElement.style.pointerEvents =
               "auto";
@@ -944,15 +1297,13 @@ function WorldMap() {
               markerElement;
 
             const marker =
-              new maptilersdk.Marker(
-                {
-                  element:
-                    markerElement,
+              new maptilersdk.Marker({
+                element:
+                  markerElement,
 
-                  anchor:
-                    "center",
-                }
-              )
+                anchor:
+                  "center",
+              })
                 .setLngLat([
                   project.lng,
                   project.lat,
@@ -965,12 +1316,31 @@ function WorldMap() {
           }
         );
 
-        /* =============================================
+        /* ==============================================
            BUILD SCROLL JOURNEY
-        ============================================= */
+        ============================================== */
 
         buildJourneyTimeline(
           map
+        );
+
+        /* ==============================================
+           FORCE INITIAL MAP RESIZE
+
+           Helps prevent first-load visual glitch.
+        ============================================== */
+
+        requestAnimationFrame(
+          () => {
+            map.resize();
+          }
+        );
+
+        setTimeout(
+          () => {
+            map.resize();
+          },
+          300
         );
       }
     );
@@ -1014,22 +1384,23 @@ function WorldMap() {
      RESET MAP
   ===================================================== */
 
-  const resetMap = () => {
-    if (
-      !storyRef.current
-    ) {
-      return;
-    }
+  const resetMap =
+    () => {
+      if (
+        !storyRef.current
+      ) {
+        return;
+      }
 
-    window.scrollTo({
-      top:
-        storyRef.current
-          .offsetTop,
+      window.scrollTo({
+        top:
+          storyRef.current
+            .offsetTop,
 
-      behavior:
-        "smooth",
-    });
-  };
+        behavior:
+          "smooth",
+      });
+    };
 
   /* =====================================================
      TOTAL SCROLL DISTANCE
@@ -1045,7 +1416,8 @@ function WorldMap() {
           wp
         ) =>
           sum +
-          (wp.hop ?? 1) +
+          (wp.hop ??
+            1) +
           DWELL,
 
         0
@@ -1060,15 +1432,16 @@ function WorldMap() {
       className="world-map-story"
       ref={storyRef}
       style={{
-        minHeight: `${
-          totalJourneyUnits *
-          SCROLL_VH_PER_UNIT
-        }vh`,
+        minHeight:
+          `${
+            totalJourneyUnits *
+            SCROLL_VH_PER_UNIT
+          }vh`,
       }}
     >
-      {/* =========================================
+      {/* =================================================
           STICKY MAP
-      ========================================== */}
+      ================================================= */}
 
       <div className="world-map-sticky">
 
@@ -1083,13 +1456,16 @@ function WorldMap() {
 
         <div className="map-gradient" />
 
-        {/* =========================================
+        {/* =================================================
             JOURNEY SIDEBAR
-        ========================================== */}
+
+            IMPORTANT:
+            Mumbai removed.
+        ================================================= */}
 
         <JourneySidebar
           projects={
-            projects
+            journeyProjects
           }
 
           activeId={
@@ -1102,9 +1478,9 @@ function WorldMap() {
           }
         />
 
-        {/* =========================================
+        {/* =================================================
             SCROLL INDICATOR
-        ========================================== */}
+        ================================================= */}
 
         {!activeProject && (
           <div className="map-scroll-hint">
@@ -1120,9 +1496,9 @@ function WorldMap() {
           </div>
         )}
 
-        {/* =========================================
+        {/* =================================================
             PROJECT PANEL
-        ========================================== */}
+        ================================================= */}
 
         <LocationPanel
           location={
@@ -1134,11 +1510,13 @@ function WorldMap() {
           }
         />
 
-        {/* =========================================
+        {/* =================================================
             MAP CONTROLS
-        ========================================== */}
+        ================================================= */}
 
         <div className="map-controls">
+
+          {/* THEME */}
 
           <button
             type="button"
@@ -1162,6 +1540,8 @@ function WorldMap() {
               />
             </svg>
           </button>
+
+          {/* COMPASS */}
 
           <button
             type="button"
@@ -1202,9 +1582,9 @@ function WorldMap() {
 
         </div>
 
-        {/* =========================================
+        {/* =================================================
             ZOOM
-        ========================================== */}
+        ================================================= */}
 
         <div className="map-zoom">
 
@@ -1240,13 +1620,15 @@ function WorldMap() {
 
         </div>
 
-        {/* =========================================
+        {/* =================================================
             JOURNEY STEPPER
-        ========================================== */}
+
+            Mumbai removed.
+        ================================================= */}
 
         <JourneyStepper
           projects={
-            projects
+            journeyProjects
           }
 
           activeId={
