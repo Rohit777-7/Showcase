@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 /*
 =====================================================
 JOURNEY STEPPER — persistent bottom-center step nav,
@@ -29,4 +31,4 @@ function JourneyStepper({ projects, activeId, onSelect }) {
   );
 }
 
-export default JourneyStepper;
+export default memo(JourneyStepper);

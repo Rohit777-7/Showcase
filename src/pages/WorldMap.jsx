@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -137,6 +138,20 @@ function cityCameraFor(project) {
 const DWELL = 0.6;
 
 const SCROLL_VH_PER_UNIT = 90;
+
+/* =====================================================
+   TERRAIN GATING
+
+   Terrain relief / 3D buildings are imperceptible at the
+   WORLDWIDE and INDIA zoom levels but still cost a full
+   GPU re-render on every jumpTo. Below this zoom they're
+   switched off entirely; every city stop is well above it
+   (12.4+), so local hops are unaffected.
+===================================================== */
+
+const TERRAIN_MIN_ZOOM = 9;
+
+const TERRAIN_EXAGGERATION = 1.2;
 
 /* =====================================================
    WAYPOINTS
@@ -290,6 +305,158 @@ function emptyLineFeature() {
 }
 
 /* =====================================================
+   ROAD ROUTE (HQ -> ... -> CITY)
+
+   Straight-line coordinates for every stop from HQ up
+   to (and including) the given project — this is also
+   the fallback used whenever the routing API can't be
+   reached.
+
+   NOTE: MapTiler's Routing/Directions API is currently
+   beta / waitlist-only (see maptiler.com/routing) and is
+   not enabled on every API key. Until an account has
+   access, requests below will fail and this straight
+   line is what actually renders — that's expected, not
+   a bug in this fallback path.
+===================================================== */
+
+function straightLineCoordinatesFor(
+  project
+) {
+  const index =
+    journeyProjects.findIndex(
+      (item) =>
+        item.id === project.id
+    );
+
+  if (index < 0) {
+    return [];
+  }
+
+  return [
+    [
+      BRAINWING_HQ.lng,
+      BRAINWING_HQ.lat,
+    ],
+
+    ...journeyProjects
+      .slice(0, index + 1)
+      .map((item) => [
+        item.lng,
+        item.lat,
+      ]),
+  ];
+}
+
+const MAPTILER_ROUTING_URL =
+  "https://api.maptiler.com/routing/v1/directions/driving";
+
+async function fetchRoadRoute(
+  points,
+  apiKey
+) {
+  const coordinates = points
+    .map(
+      ([lng, lat]) =>
+        `${lng},${lat}`
+    )
+    .join(";");
+
+  const url =
+    `${MAPTILER_ROUTING_URL}/${coordinates}` +
+    `?geometries=geojson&overview=full&key=${apiKey}`;
+
+  const response =
+    await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `MapTiler routing request failed (${response.status})`
+    );
+  }
+
+  const data =
+    await response.json();
+
+  const geometry =
+    data?.routes?.[0]?.geometry;
+
+  if (
+    geometry?.type !==
+      "LineString" ||
+    !Array.isArray(
+      geometry.coordinates
+    ) ||
+    geometry.coordinates.length <
+      2
+  ) {
+    throw new Error(
+      "MapTiler routing response had no usable route geometry"
+    );
+  }
+
+  return geometry.coordinates;
+}
+
+/* =====================================================
+   ROAD ROUTE CACHE
+
+   Module-level (not component state) so a fetched route
+   is remembered for as long as the page lives, even if
+   WorldMap unmounts/remounts. Keyed by project id since
+   the point list for a given project never changes.
+
+   Stores the in-flight/resolved promise, not just the
+   result, so two near-simultaneous requests for the same
+   project (enterWaypoint + a quick scroll back) share one
+   fetch instead of firing twice.
+===================================================== */
+
+const roadRouteCache = new Map();
+
+function roadRouteCoordinatesFor(
+  project,
+  apiKey
+) {
+  const cached =
+    roadRouteCache.get(
+      project.id
+    );
+
+  if (cached) {
+    return cached;
+  }
+
+  const fallback =
+    straightLineCoordinatesFor(
+      project
+    );
+
+  const promise = apiKey
+    ? fetchRoadRoute(
+        fallback,
+        apiKey
+      ).catch((error) => {
+        console.warn(
+          `Road routing unavailable for ${project.city}, using straight line.`,
+          error
+        );
+
+        return fallback;
+      })
+    : Promise.resolve(
+        fallback
+      );
+
+  roadRouteCache.set(
+    project.id,
+    promise
+  );
+
+  return promise;
+}
+
+/* =====================================================
    HIDE MAPTILER LABELS
 
    We keep BrainWing's own markers.
@@ -317,16 +484,9 @@ function cleanMapLabels(map) {
     });
   };
 
-  hide();
-
   map.once(
     "idle",
     hide
-  );
-
-  setTimeout(
-    hide,
-    500
   );
 }
 
@@ -374,6 +534,13 @@ function addRealisticBuildings(map) {
       "building",
 
     minzoom: 13,
+
+    // Starts hidden — matches terrainActiveRef's initial
+    // false; syncCamera() flips this in step with terrain.
+    layout: {
+      visibility:
+        "none",
+    },
 
     paint: {
       "fill-extrusion-color": [
@@ -464,83 +631,27 @@ function WorldMap() {
   const activeIdRef =
     useRef(null);
 
+  const terrainActiveRef =
+    useRef(false);
+
+  const routeRequestIdRef =
+    useRef(0);
+
+  const stickyRef =
+    useRef(null);
+
+  const scrubTimeoutRef =
+    useRef(null);
+
   const [activeProject, setActiveProject] =
     useState(null);
-
-  /* =====================================================
-     ROUTE STOPS
-
-     HQ is always the first point.
-
-     Then all project locations.
-
-     Example:
-
-     HQ
-      ↓
-     Borivali
-      ↓
-     Thane
-      ↓
-     Colaba
-      ↓
-     Bangalore
-      ↓
-     London
-  ===================================================== */
-
-  const routeStops = [
-    BRAINWING_HQ,
-    ...journeyProjects,
-  ];
-
-  /* =====================================================
-     CREATE ROUTE COORDINATES
-
-     ONLY real locations.
-
-     NEVER camera coordinates.
-  ===================================================== */
-
-  const coordinatesForProject =
-    (project) => {
-      const index =
-        journeyProjects.findIndex(
-          (item) =>
-            item.id ===
-            project.id
-        );
-
-      if (index < 0) {
-        return [];
-      }
-
-      return [
-        [
-          BRAINWING_HQ.lng,
-          BRAINWING_HQ.lat,
-        ],
-
-        ...journeyProjects
-          .slice(
-            0,
-            index + 1
-          )
-          .map(
-            (item) => [
-              item.lng,
-              item.lat,
-            ]
-          ),
-      ];
-    };
 
   /* =====================================================
      SET ACTIVE ROUTE
   ===================================================== */
 
   const setActiveRoute =
-    (coordinates) => {
+    useCallback((coordinates) => {
       const source =
         mapRef.current?.getSource(
           "brainwing-route-active"
@@ -559,14 +670,14 @@ function WorldMap() {
           coordinates,
         },
       });
-    };
+    }, []);
 
   /* =====================================================
      ACTIVE MARKER
   ===================================================== */
 
   const setActiveMarker =
-    (id) => {
+    useCallback((id) => {
       Object.entries(
         markerElsRef.current
       ).forEach(
@@ -580,7 +691,57 @@ function WorldMap() {
           );
         }
       );
-    };
+    }, []);
+
+  /* =====================================================
+     APPLY ROUTE
+
+     Shows the straight-line path immediately (so the
+     route is never empty while a request is in flight),
+     then swaps in the real road-routed geometry once it
+     resolves — see roadRouteCoordinatesFor() above, which
+     caches per project and falls back to the straight
+     line on any fetch failure.
+
+     routeRequestIdRef guards against a slow response for
+     a project the user has since scrolled past
+     overwriting a newer route.
+  ===================================================== */
+
+  const applyRoute =
+    useCallback((project) => {
+      const requestId =
+        ++routeRequestIdRef.current;
+
+      if (!project) {
+        setActiveRoute([]);
+
+        return;
+      }
+
+      setActiveRoute(
+        straightLineCoordinatesFor(
+          project
+        )
+      );
+
+      roadRouteCoordinatesFor(
+        project,
+        maptilersdk.config
+          .apiKey
+      ).then((coordinates) => {
+        if (
+          routeRequestIdRef.current !==
+          requestId
+        ) {
+          return;
+        }
+
+        setActiveRoute(
+          coordinates
+        );
+      });
+    }, [setActiveRoute]);
 
   /* =====================================================
      ENTER PROJECT
@@ -593,7 +754,7 @@ function WorldMap() {
   ===================================================== */
 
   const enterWaypoint =
-    (waypoint) => {
+    useCallback((waypoint) => {
       const id =
         waypoint.project?.id ??
         null;
@@ -612,25 +773,10 @@ function WorldMap() {
         setActiveMarker(id);
       }
 
-      if (
-        !waypoint.project
-      ) {
-        setActiveRoute(
-          []
-        );
-
-        return;
-      }
-
-      const routeCoordinates =
-        coordinatesForProject(
-          waypoint.project
-        );
-
-      setActiveRoute(
-        routeCoordinates
+      applyRoute(
+        waypoint.project
       );
-    };
+    }, [applyRoute, setActiveMarker]);
 
   /* =====================================================
      DURING CAMERA TRANSITION
@@ -642,7 +788,7 @@ function WorldMap() {
   ===================================================== */
 
   const transitFrom =
-    (fromWaypoint) => {
+    useCallback((fromWaypoint) => {
       if (
         activeIdRef.current !==
         null
@@ -659,32 +805,17 @@ function WorldMap() {
         );
       }
 
-      if (
-        !fromWaypoint.project
-      ) {
-        setActiveRoute(
-          []
-        );
-
-        return;
-      }
-
-      const routeCoordinates =
-        coordinatesForProject(
-          fromWaypoint.project
-        );
-
-      setActiveRoute(
-        routeCoordinates
+      applyRoute(
+        fromWaypoint.project
       );
-    };
+    }, [applyRoute, setActiveMarker]);
 
   /* =====================================================
      SYNC JOURNEY STATE
   ===================================================== */
 
   const syncJourneyState =
-    (time) => {
+    useCallback((time) => {
       const breakpoints =
         breakpointsRef.current;
 
@@ -755,14 +886,14 @@ function WorldMap() {
           return;
         }
       }
-    };
+    }, [enterWaypoint, transitFrom]);
 
   /* =====================================================
      BUILD CAMERA TIMELINE
   ===================================================== */
 
   const buildJourneyTimeline =
-    (map) => {
+    useCallback((map) => {
       const proxy =
         cameraProxyRef.current;
 
@@ -776,6 +907,22 @@ function WorldMap() {
           leave: DWELL,
         },
       ];
+
+      /* ================================================
+         SYNC CAMERA
+
+         jumpTo is already the cheap, non-animated path
+         (GSAP's own ticker already batches this to one
+         call per animation frame, so there's no cheaper
+         per-tick update to throttle to).
+
+         What actually made every tick expensive was
+         terrain + 3D buildings recomputing a full GPU
+         scene even during the low-zoom WORLDWIDE/INDIA
+         legs where neither is visible. Both are now
+         toggled on/off only when crossing the zoom
+         threshold, not re-applied every frame.
+      ================================================= */
 
       const syncCamera =
         () => {
@@ -795,12 +942,82 @@ function WorldMap() {
               proxy.bearing,
           });
 
+          const shouldHaveTerrain =
+            proxy.zoom >=
+            TERRAIN_MIN_ZOOM;
+
+          if (
+            shouldHaveTerrain !==
+            terrainActiveRef.current
+          ) {
+            terrainActiveRef.current =
+              shouldHaveTerrain;
+
+            if (
+              shouldHaveTerrain
+            ) {
+              map.enableTerrain(
+                TERRAIN_EXAGGERATION
+              );
+            } else {
+              map.disableTerrain();
+            }
+
+            if (
+              map.getLayer(
+                "brainwing-3d-buildings"
+              )
+            ) {
+              map.setLayoutProperty(
+                "brainwing-3d-buildings",
+                "visibility",
+                shouldHaveTerrain
+                  ? "visible"
+                  : "none"
+              );
+            }
+          }
+
           if (
             compassNeedleRef.current
           ) {
             compassNeedleRef.current.style.transform =
               `rotate(${-proxy.bearing}deg)`;
           }
+        };
+
+      /* ================================================
+         SCRUBBING STATE
+
+         Panels overlaying the canvas use backdrop-filter
+         blur, which forces a re-composite of the live
+         WebGL layer beneath them on every repaint. That's
+         fine at rest, but during active scroll (every
+         frame repainting anyway) it's pure added cost —
+         so it's suspended while scrubbing and restored a
+         moment after scrolling settles.
+      ================================================= */
+
+      const markScrubbing =
+        () => {
+          stickyRef.current?.classList.add(
+            "is-scrubbing"
+          );
+
+          if (
+            scrubTimeoutRef.current
+          ) {
+            clearTimeout(
+              scrubTimeoutRef.current
+            );
+          }
+
+          scrubTimeoutRef.current =
+            setTimeout(() => {
+              stickyRef.current?.classList.remove(
+                "is-scrubbing"
+              );
+            }, 160);
         };
 
       const tl =
@@ -818,10 +1035,13 @@ function WorldMap() {
             scrub: 0.7,
 
             onUpdate:
-              () =>
+              () => {
+                markScrubbing();
+
                 syncJourneyState(
                   tl.time()
-                ),
+                );
+              },
           },
         });
 
@@ -901,14 +1121,14 @@ function WorldMap() {
         breakpoints;
 
       syncJourneyState(0);
-    };
+    }, [syncJourneyState]);
 
   /* =====================================================
      SCROLL TO PROJECT
   ===================================================== */
 
   const scrollToProject =
-    (project) => {
+    useCallback((project) => {
       const tl =
         timelineRef.current;
 
@@ -948,7 +1168,7 @@ function WorldMap() {
         behavior:
           "smooth",
       });
-    };
+    }, []);
 
   /* =====================================================
      INITIALIZE MAP
@@ -1034,11 +1254,10 @@ function WorldMap() {
         scrollZoom:
           false,
 
-        terrain:
-          true,
-
-        terrainExaggeration:
-          1.2,
+        // Terrain starts disabled — the initial camera
+        // (waypoints[0], zoom 3.3) is well below
+        // TERRAIN_MIN_ZOOM, and syncCamera() enables it
+        // once scroll brings zoom into city range.
       });
 
     mapRef.current =
@@ -1335,13 +1554,6 @@ function WorldMap() {
             map.resize();
           }
         );
-
-        setTimeout(
-          () => {
-            map.resize();
-          },
-          300
-        );
       }
     );
 
@@ -1350,6 +1562,14 @@ function WorldMap() {
     ================================================= */
 
     return () => {
+      if (
+        scrubTimeoutRef.current
+      ) {
+        clearTimeout(
+          scrubTimeoutRef.current
+        );
+      }
+
       timelineRef.current
         ?.scrollTrigger
         ?.kill();
@@ -1385,7 +1605,7 @@ function WorldMap() {
   ===================================================== */
 
   const resetMap =
-    () => {
+    useCallback(() => {
       if (
         !storyRef.current
       ) {
@@ -1400,7 +1620,7 @@ function WorldMap() {
         behavior:
           "smooth",
       });
-    };
+    }, []);
 
   /* =====================================================
      TOTAL SCROLL DISTANCE
@@ -1443,7 +1663,10 @@ function WorldMap() {
           STICKY MAP
       ================================================= */}
 
-      <div className="world-map-sticky">
+      <div
+        className="world-map-sticky"
+        ref={stickyRef}
+      >
 
         <div
           ref={

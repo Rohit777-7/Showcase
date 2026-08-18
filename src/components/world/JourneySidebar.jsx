@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 /*
 =====================================================
 JOURNEY SIDEBAR — persistent left-hand list of every
@@ -69,4 +71,4 @@ function JourneySidebar({ projects, activeId, onSelect }) {
   );
 }
 
-export default JourneySidebar;
+export default memo(JourneySidebar);

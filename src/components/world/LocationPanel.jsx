@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 
 /*
@@ -141,4 +141,4 @@ function LocationPanel({ location, onClose }) {
   );
 }
 
-export default LocationPanel;
+export default memo(LocationPanel);

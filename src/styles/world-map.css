@@ -1197,6 +1197,29 @@ position: absolute so they can't expand it.
 }
 
 /* =========================================
+   SCRUBBING PERFORMANCE
+
+   backdrop-filter forces a re-composite of the live
+   WebGL canvas beneath these panels on every repaint.
+   Harmless at rest, but wasted cost during active scroll
+   scrubbing (already repainting every frame) — so it's
+   suspended while WorldMap.jsx has .is-scrubbing on the
+   sticky wrapper, and restored once scrolling settles.
+   The panels' own background colors keep them legible
+   either way.
+========================================= */
+
+.world-map-sticky.is-scrubbing .map-project-panel,
+.world-map-sticky.is-scrubbing .journey-sidebar,
+.world-map-sticky.is-scrubbing .journey-stepper,
+.world-map-sticky.is-scrubbing .map-controls,
+.world-map-sticky.is-scrubbing .map-zoom,
+.world-map-sticky.is-scrubbing .hq-label {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =========================================
    MOBILE
 ========================================= */
 
