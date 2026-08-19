@@ -282,14 +282,19 @@ const waypoints = [
 /* =====================================================
    SCROLL → WAYPOINT LOOKUP
 
-   Every waypoint after the first owns a fixed chunk of
-   the page's scroll range (sized by its "hop" weight).
-   waypointThresholds[i] is the scroll position (in hop
-   units) at which waypoint i becomes active.
+   Every waypoint (after India) owns a fixed chunk of the
+   page's scroll range sized by ITS OWN "hop" weight —
+   waypointStarts[i] is the scroll position (in hop units)
+   at which waypoint i becomes active.
+
+   India (index 0) owns no scroll range of its own — it's
+   only what's on screen before any scrolling happens.
+   The very first pixel of scroll snaps straight to
+   BrainWing, so there's no dead scroll zone up front.
 ===================================================== */
 
-const waypointThresholds = (() => {
-  const thresholds = [0];
+const waypointStarts = (() => {
+  const starts = [0];
 
   let cursor = 0;
 
@@ -298,33 +303,40 @@ const waypointThresholds = (() => {
     i < waypoints.length;
     i++
   ) {
+    starts.push(cursor);
+
     cursor +=
       waypoints[i].hop ?? 1;
-
-    thresholds.push(cursor);
   }
 
-  return thresholds;
+  return starts;
 })();
 
 const TOTAL_JOURNEY_UNITS =
-  waypointThresholds[
-    waypointThresholds.length - 1
-  ];
+  waypointStarts[
+    waypointStarts.length - 1
+  ] +
+  (waypoints[
+    waypoints.length - 1
+  ].hop ?? 1);
 
 function waypointIndexForScrollUnits(
   scrollUnits
 ) {
+  if (scrollUnits <= 0) {
+    return 0;
+  }
+
   let index = 0;
 
   for (
     let i = 1;
-    i < waypointThresholds.length;
+    i < waypointStarts.length;
     i++
   ) {
     if (
       scrollUnits >=
-      waypointThresholds[i]
+      waypointStarts[i]
     ) {
       index = i;
     } else {
@@ -336,22 +348,17 @@ function waypointIndexForScrollUnits(
 }
 
 /* =====================================================
-   ROAD ROUTE (HQ -> ... -> CITY)
+   ROUTE (HQ -> ... -> CITY)
 
-   Straight-line coordinates for every stop from HQ up
-   to (and including) the given project — this is also
-   the fallback used whenever the routing API can't be
-   reached.
-
-   NOTE: MapTiler's Routing/Directions API is currently
-   beta / waitlist-only (see maptiler.com/routing) and is
-   not enabled on every API key. Until an account has
-   access, requests below will fail and this straight
-   line is what actually renders — that's expected, not
-   a bug in this fallback path.
+   Straight-line coordinates for every stop from HQ up to
+   (and including) the given project. Every point comes
+   directly from that project's own lng/lat, so the drawn
+   line always terminates exactly on its marker — no
+   external routing request involved, and nothing that can
+   snap to a nearby road and leave a visible gap.
 ===================================================== */
 
-function straightLineCoordinatesFor(
+function routeCoordinatesFor(
   project
 ) {
   const index =
@@ -377,113 +384,6 @@ function straightLineCoordinatesFor(
         item.lat,
       ]),
   ];
-}
-
-const MAPTILER_ROUTING_URL =
-  "https://api.maptiler.com/routing/v1/directions/driving";
-
-async function fetchRoadRoute(
-  points,
-  apiKey
-) {
-  const coordinates = points
-    .map(
-      ([lng, lat]) =>
-        `${lng},${lat}`
-    )
-    .join(";");
-
-  const url =
-    `${MAPTILER_ROUTING_URL}/${coordinates}` +
-    `?geometries=geojson&overview=full&key=${apiKey}`;
-
-  const response =
-    await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      `MapTiler routing request failed (${response.status})`
-    );
-  }
-
-  const data =
-    await response.json();
-
-  const geometry =
-    data?.routes?.[0]?.geometry;
-
-  if (
-    geometry?.type !==
-      "LineString" ||
-    !Array.isArray(
-      geometry.coordinates
-    ) ||
-    geometry.coordinates.length <
-      2
-  ) {
-    throw new Error(
-      "MapTiler routing response had no usable route geometry"
-    );
-  }
-
-  return geometry.coordinates;
-}
-
-/* =====================================================
-   ROAD ROUTE CACHE
-
-   Module-level (not component state) so a fetched route
-   is remembered for as long as the page lives, even if
-   WorldMap unmounts/remounts. Keyed by project id since
-   the point list for a given project never changes.
-
-   Stores the in-flight/resolved promise, not just the
-   result, so two near-simultaneous requests for the same
-   project don't fire twice.
-===================================================== */
-
-const roadRouteCache = new Map();
-
-function roadRouteCoordinatesFor(
-  project,
-  apiKey
-) {
-  const cached =
-    roadRouteCache.get(
-      project.id
-    );
-
-  if (cached) {
-    return cached;
-  }
-
-  const fallback =
-    straightLineCoordinatesFor(
-      project
-    );
-
-  const promise = apiKey
-    ? fetchRoadRoute(
-        fallback,
-        apiKey
-      ).catch((error) => {
-        console.warn(
-          `Road routing unavailable for ${project.city}, using straight line.`,
-          error
-        );
-
-        return fallback;
-      })
-    : Promise.resolve(
-        fallback
-      );
-
-  roadRouteCache.set(
-    project.id,
-    promise
-  );
-
-  return promise;
 }
 
 /* =====================================================
@@ -552,9 +452,6 @@ function WorldMap() {
   const activeIdRef =
     useRef(null);
 
-  const routeRequestIdRef =
-    useRef(0);
-
   const stickyRef =
     useRef(null);
 
@@ -615,51 +512,20 @@ function WorldMap() {
      APPLY ROUTE
 
      Draws the full HQ → ... → current-city path in one
-     shot (no per-frame progressive redraw). Shows the
-     straight-line fallback immediately, then swaps in the
-     real road-routed geometry once it resolves — see
-     roadRouteCoordinatesFor() above, which caches per
-     project and falls back to the straight line on fetch
-     failure.
-
-     routeRequestIdRef guards against a slow response for
-     a project the user has since scrolled past
-     overwriting a newer route.
+     shot, straight from each project's own coordinates —
+     see routeCoordinatesFor() above. No network request,
+     so the line always lands exactly on the marker.
   ===================================================== */
 
   const applyRoute =
     useCallback((project) => {
-      const requestId =
-        ++routeRequestIdRef.current;
-
-      if (!project) {
-        setActiveRoute([]);
-
-        return;
-      }
-
       setActiveRoute(
-        straightLineCoordinatesFor(
-          project
-        )
+        project
+          ? routeCoordinatesFor(
+              project
+            )
+          : []
       );
-
-      roadRouteCoordinatesFor(
-        project,
-        maptilersdk.config
-          .apiKey
-      ).then((coordinates) => {
-        if (
-          routeRequestIdRef.current !==
-          requestId
-        ) {
-          return;
-        }
-
-        setActiveRoute(
-          coordinates
-        );
-      });
     }, [setActiveRoute]);
 
   /* =====================================================
@@ -672,7 +538,7 @@ function WorldMap() {
   ===================================================== */
 
   const goToWaypoint =
-    useCallback((index, { animate = true } = {}) => {
+    useCallback((index) => {
       const waypoint =
         waypoints[index];
 
@@ -686,39 +552,27 @@ function WorldMap() {
       const camera =
         waypoint.camera;
 
-      if (animate) {
-        map.easeTo({
-          center:
-            camera.center,
+      // A true instant snap — no easeTo. For long hops
+      // (e.g. Colaba -> Bangalore, Bangalore -> London)
+      // an animated ease still has to visually travel the
+      // real distance, which means zooming out to a wide
+      // overview mid-flight (real tile loading) before
+      // zooming back in. Landing on that mid-flight frame
+      // is exactly what made the route look disconnected
+      // from its marker — jumpTo never has that window.
+      map.jumpTo({
+        center:
+          camera.center,
 
-          zoom:
-            camera.zoom,
+        zoom:
+          camera.zoom,
 
-          pitch:
-            camera.pitch,
+        pitch:
+          camera.pitch,
 
-          bearing:
-            camera.bearing,
-
-          duration: 500,
-
-          essential: true,
-        });
-      } else {
-        map.jumpTo({
-          center:
-            camera.center,
-
-          zoom:
-            camera.zoom,
-
-          pitch:
-            camera.pitch,
-
-          bearing:
-            camera.bearing,
-        });
-      }
+        bearing:
+          camera.bearing,
+      });
 
       const id =
         waypoint.project?.id ??
@@ -838,7 +692,7 @@ function WorldMap() {
       }
 
       const fraction =
-        waypointThresholds[
+        waypointStarts[
           index
         ] /
         TOTAL_JOURNEY_UNITS;
@@ -1039,12 +893,6 @@ function WorldMap() {
 
             "line-opacity":
               0.95,
-
-            "line-dasharray":
-              [
-                1,
-                1.8,
-              ],
           },
         });
 
@@ -1214,9 +1062,7 @@ function WorldMap() {
         activeIndexRef.current =
           0;
 
-        goToWaypoint(0, {
-          animate: false,
-        });
+        goToWaypoint(0);
 
         /* ==============================================
            FORCE INITIAL MAP RESIZE

@@ -285,7 +285,17 @@ position: absolute so they can't expand it.
 */
 
 .brainwing-scroll-marker {
-  position: relative;
+  /*
+  Must stay "absolute" (matching maplibregl-marker's own
+  rule) — this element IS the map SDK's marker root, and
+  its position on screen comes entirely from the inline
+  transform the SDK applies. "relative" here drops it into
+  normal document flow instead, so every marker after the
+  first stacks sideways from the last one (each offset by
+  roughly its own width) instead of sitting at its real
+  map coordinate.
+  */
+  position: absolute;
 
   width: 28px;
   height: 28px;
@@ -1319,7 +1329,8 @@ position: absolute so they can't expand it.
 ===================================================== */
 
 .brainwing-hq-marker {
-  position: relative !important;
+  /* See .brainwing-scroll-marker — must match maplibregl-marker's own "absolute". */
+  position: absolute !important;
   width: 28px;
   height: 28px;
   padding: 0;
