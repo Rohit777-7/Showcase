@@ -1,0 +1,329 @@
+/* =====================================================
+   PROJECT MARKER POPUP
+===================================================== */
+
+.project-marker-popup {
+  position: absolute;
+
+  left: 50%;
+  bottom: calc(100% + 18px);
+
+  width: 260px;
+
+  transform:
+    translateX(-50%)
+    translateY(10px)
+    scale(0.96);
+
+  padding: 18px;
+
+  background:
+    rgba(4, 17, 27, 0.96);
+
+  border:
+    1px solid
+    rgba(105, 244, 255, 0.32);
+
+  border-radius: 8px;
+
+  backdrop-filter:
+    blur(16px);
+
+  box-shadow:
+    0 18px 50px
+    rgba(0, 0, 0, 0.45),
+
+    0 0 30px
+    rgba(105, 244, 255, 0.08);
+
+  opacity: 0;
+
+  visibility: hidden;
+
+  pointer-events: none;
+
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s
+      cubic-bezier(
+        0.22,
+        1,
+        0.36,
+        1
+      );
+
+  z-index: 3000;
+}
+
+
+/* =====================================================
+   SMALL CONNECTOR LINE
+===================================================== */
+
+.project-marker-popup::after {
+  content: "";
+
+  position: absolute;
+
+  left: 50%;
+
+  bottom: -12px;
+
+  width: 1px;
+
+  height: 12px;
+
+  background:
+    rgba(
+      105,
+      244,
+      255,
+      0.6
+    );
+}
+
+
+/* =====================================================
+   SHOW ONLY ACTIVE MARKER POPUP
+===================================================== */
+
+.brainwing-scroll-marker.is-active
+  .project-marker-popup {
+
+  opacity: 1;
+
+  visibility: visible;
+
+  pointer-events: auto;
+
+  transform:
+    translateX(-50%)
+    translateY(0)
+    scale(1);
+}
+
+
+/* =====================================================
+   KICKER
+===================================================== */
+
+.project-popup-kicker {
+  font-size: 8px;
+
+  letter-spacing:
+    0.28em;
+
+  color:
+    #69f4ff;
+
+  margin-bottom: 7px;
+}
+
+
+/* =====================================================
+   LOCATION
+===================================================== */
+
+.project-popup-location {
+  font-size: 18px;
+
+  font-weight: 400;
+
+  letter-spacing:
+    0.08em;
+
+  color:
+    #ffffff;
+
+  margin-bottom: 14px;
+}
+
+
+/* =====================================================
+   PROJECT LIST
+===================================================== */
+
+.project-popup-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 5px;
+}
+
+
+/* =====================================================
+   PROJECT ITEM
+===================================================== */
+
+.project-popup-item {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    28px
+    1fr
+    20px;
+
+  align-items: center;
+
+  gap: 8px;
+
+  padding:
+    10px 8px;
+
+  border:
+    1px solid
+    rgba(
+      105,
+      244,
+      255,
+      0.08
+    );
+
+  border-radius: 4px;
+
+  background:
+    rgba(
+      105,
+      244,
+      255,
+      0.025
+    );
+
+  cursor: pointer;
+
+  text-align: left;
+
+  color:
+    #d8ffff;
+
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+
+.project-popup-item:hover {
+  background:
+    rgba(
+      105,
+      244,
+      255,
+      0.1
+    );
+
+  border-color:
+    rgba(
+      105,
+      244,
+      255,
+      0.3
+    );
+
+  transform:
+    translateX(3px);
+}
+
+
+/* =====================================================
+   NUMBER
+===================================================== */
+
+.project-popup-number {
+  font-size: 8px;
+
+  letter-spacing:
+    0.12em;
+
+  color:
+    #69f4ff;
+}
+
+
+/* =====================================================
+   NAME
+===================================================== */
+
+.project-popup-name {
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+
+  font-size: 9px;
+
+  letter-spacing:
+    0.08em;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.82
+    );
+}
+
+
+/* =====================================================
+   ARROW
+===================================================== */
+
+.project-popup-arrow {
+  font-size: 14px;
+
+  color:
+    #69f4ff;
+
+  text-align: right;
+}
+
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+.project-popup-footer {
+  margin-top: 14px;
+
+  padding-top: 11px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+
+  font-size: 7px;
+
+  letter-spacing:
+    0.25em;
+
+  color:
+    rgba(
+      216,
+      255,
+      255,
+      0.4
+    );
+}
+
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 700px) {
+
+  .project-marker-popup {
+    width: 220px;
+  }
+
+}

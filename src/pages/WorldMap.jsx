@@ -4,7 +4,8 @@ import {
   useRef,
   useState,
 } from "react";
-
+import { createRoot } from "react-dom/client";
+import ProjectMarkerPopup from "../components/world/ProjectMarkerPopup";
 import * as maptilersdk from "@maptiler/sdk";
 
 import gsap from "gsap";
@@ -14,7 +15,6 @@ import "@maptiler/sdk/dist/maptiler-sdk.css";
 
 import { projects } from "../data/projects";
 
-import LocationPanel from "../components/world/LocationPanel";
 import JourneySidebar from "../components/world/JourneySidebar";
 import JourneyStepper from "../components/world/JourneyStepper";
 
@@ -348,42 +348,83 @@ function waypointIndexForScrollUnits(
 }
 
 /* =====================================================
-   ROUTE (HQ -> ... -> CITY)
+   ROAD ROUTING
 
-   Straight-line coordinates for every stop from HQ up to
-   (and including) the given project. Every point comes
-   directly from that project's own lng/lat, so the drawn
-   line always terminates exactly on its marker — no
-   external routing request involved, and nothing that can
-   snap to a nearby road and leave a visible gap.
+   Every project gets its own route from BrainWing HQ.
+   We do NOT chain Borivali -> Thane -> Colaba, etc.
+   The visual routes are:
+
+   BrainWing -> Borivali
+   BrainWing -> Thane
+   BrainWing -> Colaba
+   BrainWing -> Bangalore
+   BrainWing -> London
+
+   OSRM returns actual drivable road geometry. If the
+   routing service is unavailable, a curved fallback keeps
+   the experience visually intact.
 ===================================================== */
 
-function routeCoordinatesFor(
-  project
-) {
-  const index =
-    journeyProjects.findIndex(
-      (item) =>
-        item.id === project.id
-    );
+function fallbackRoadRoute(project) {
+  const a = [BRAINWING_HQ.lng, BRAINWING_HQ.lat];
+  const b = [project.lng, project.lat];
 
-  if (index < 0) {
-    return [];
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const distance = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+
+  const nx = -dy / distance;
+  const ny = dx / distance;
+  const bend = Math.min(2.2, Math.max(0.3, distance * 0.07));
+  const steps = Math.max(20, Math.min(100, Math.ceil(distance * 10)));
+  const points = [];
+
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const curve = Math.sin(t * Math.PI) * bend;
+
+    points.push([
+      a[0] + dx * t + nx * curve,
+      a[1] + dy * t + ny * curve,
+    ]);
   }
 
-  return [
-    [
-      BRAINWING_HQ.lng,
-      BRAINWING_HQ.lat,
-    ],
+  return points;
+}
 
-    ...journeyProjects
-      .slice(0, index + 1)
-      .map((item) => [
-        item.lng,
-        item.lat,
-      ]),
-  ];
+async function fetchRoadRoute(project) {
+  const start = `${BRAINWING_HQ.lng},${BRAINWING_HQ.lat}`;
+  const end = `${project.lng},${project.lat}`;
+
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/${start};${end}` +
+    `?overview=full&geometries=geojson&steps=false`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`OSRM ${response.status}`);
+    }
+
+    const data = await response.json();
+    const coordinates = data?.routes?.[0]?.geometry?.coordinates;
+
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      throw new Error("No road geometry returned");
+    }
+
+    return coordinates;
+  } catch (error) {
+    console.warn(
+      `Road route unavailable for ${project.city}; using fallback.`,
+      error
+    );
+
+    return fallbackRoadRoute(project);
+  }
 }
 
 /* =====================================================
@@ -421,6 +462,75 @@ function cleanMapLabels(map) {
 }
 
 /* =====================================================
+   PROJECT VIEWER
+
+   The selected live project opens inside the showcase.
+   × closes it and leaves the map at the same scroll state.
+   OPEN LIVE remains available for projects that block iframe
+   embedding.
+===================================================== */
+
+function ProjectViewer({ item, location, onClose }) {
+  const [loaded, setLoaded] = useState(false);
+
+  if (!item) return null;
+
+  return (
+    <div className="project-viewer" role="dialog" aria-modal="true">
+      <div className="project-viewer-backdrop" />
+
+      <div className="project-viewer-shell">
+        <header className="project-viewer-header">
+          <div>
+            <span className="project-viewer-kicker">
+              {location?.city?.toUpperCase()} · BRAINWING PROJECT
+            </span>
+            <h3>{item.name}</h3>
+          </div>
+
+          <div className="project-viewer-actions">
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="project-viewer-open"
+            >
+              OPEN LIVE ↗
+            </a>
+
+            <button
+              type="button"
+              className="project-viewer-close"
+              onClick={onClose}
+              aria-label="Back to project map"
+            >
+              ×
+            </button>
+          </div>
+        </header>
+
+        <div className="project-viewer-content">
+          {!loaded && (
+            <div className="project-viewer-loader">
+              <span>LOADING PROJECT</span>
+              <div className="project-loader-line"><i /></div>
+              <small>{item.category}</small>
+            </div>
+          )}
+
+          <iframe
+            src={item.url}
+            title={item.name}
+            onLoad={() => setLoaded(true)}
+            className={loaded ? "is-loaded" : ""}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =====================================================
    WORLD MAP
 ===================================================== */
 
@@ -443,6 +553,9 @@ function WorldMap() {
   const markerElsRef =
     useRef({});
 
+  const popupRootsRef =
+    useRef({});
+
   const scrollTriggerRef =
     useRef(null);
 
@@ -451,6 +564,18 @@ function WorldMap() {
 
   const activeIdRef =
     useRef(null);
+
+  const routeCacheRef =
+    useRef({});
+
+  const routeAnimationRef =
+    useRef(null);
+
+  const [mapReady, setMapReady] =
+    useState(false);
+
+  const [selectedProjectItem, setSelectedProjectItem] =
+    useState(null);
 
   const stickyRef =
     useRef(null);
@@ -462,44 +587,92 @@ function WorldMap() {
     useState(null);
 
   /* =====================================================
-     SET ACTIVE ROUTE
+     ROUTE + CAMERA ANIMATION
+
+     Camera movement and road drawing share one duration.
+     The route is progressively revealed while the camera
+     travels toward the selected location.
   ===================================================== */
 
-  const setActiveRoute =
-    useCallback((coordinates) => {
-      const source =
-        mapRef.current?.getSource(
-          "brainwing-route-active"
-        );
+  const setRouteData = useCallback((coordinates) => {
+    const source = mapRef.current?.getSource(
+      "brainwing-route-active"
+    );
 
-      if (!source) {
-        return;
+    if (!source) return;
+
+    source.setData({
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "LineString",
+        coordinates: coordinates ?? [],
+      },
+    });
+  }, []);
+
+  const animateRoute = useCallback((coordinates, duration) => {
+    if (routeAnimationRef.current) {
+      cancelAnimationFrame(routeAnimationRef.current);
+      routeAnimationRef.current = null;
+    }
+
+    if (!coordinates?.length) {
+      setRouteData([]);
+      return;
+    }
+
+    const started = performance.now();
+
+    const draw = (now) => {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const count = Math.max(2, Math.floor(eased * coordinates.length));
+
+      setRouteData(coordinates.slice(0, count));
+
+      if (progress < 1) {
+        routeAnimationRef.current = requestAnimationFrame(draw);
+      } else {
+        routeAnimationRef.current = null;
       }
+    };
 
-      source.setData({
-        type: "Feature",
+    routeAnimationRef.current = requestAnimationFrame(draw);
+  }, [setRouteData]);
 
-        geometry: {
-          type: "LineString",
+  const animateRoadAndCamera = useCallback((waypoint, coordinates) => {
+    const map = mapRef.current;
+    if (!map || !waypoint) return;
 
-          coordinates,
-        },
-      });
-    }, []);
+    const camera = waypoint.camera;
+    const duration = waypoint.project ? 2200 : 1800;
 
-  /* =====================================================
-     ACTIVE MARKER
-  ===================================================== */
+    map.stop();
+
+    if (waypoint.project && coordinates?.length) {
+      animateRoute(coordinates, duration);
+    } else {
+      setRouteData([]);
+    }
+
+    map.easeTo({
+      center: camera.center,
+      zoom: camera.zoom,
+      pitch: camera.pitch,
+      bearing: camera.bearing,
+      duration,
+      easing: (t) => 1 - Math.pow(1 - t, 3),
+      essential: true,
+    });
+  }, [animateRoute, setRouteData]);
 
   const setActiveMarker =
     useCallback((id) => {
       Object.entries(
         markerElsRef.current
       ).forEach(
-        ([
-          projectId,
-          element,
-        ]) => {
+        ([projectId, element]) => {
           element.classList.toggle(
             "is-active",
             projectId === id
@@ -508,94 +681,55 @@ function WorldMap() {
       );
     }, []);
 
-  /* =====================================================
-     APPLY ROUTE
-
-     Draws the full HQ → ... → current-city path in one
-     shot, straight from each project's own coordinates —
-     see routeCoordinatesFor() above. No network request,
-     so the line always lands exactly on the marker.
-  ===================================================== */
-
-  const applyRoute =
-    useCallback((project) => {
-      setActiveRoute(
-        project
-          ? routeCoordinatesFor(
-              project
-            )
-          : []
-      );
-    }, [setActiveRoute]);
-
-  /* =====================================================
-     GO TO WAYPOINT
-
-     Snaps the camera directly to a waypoint's final
-     position (a single short easeTo, not a scroll-linked
-     tween through every intermediate point) so the map
-     only ever needs tiles for real stops.
-  ===================================================== */
-
   const goToWaypoint =
-    useCallback((index) => {
-      const waypoint =
-        waypoints[index];
+    useCallback(async (index) => {
+      const waypoint = waypoints[index];
+      const map = mapRef.current;
 
-      const map =
-        mapRef.current;
+      if (!waypoint || !map) return;
 
-      if (!waypoint || !map) {
+      const id = waypoint.project?.id ?? null;
+
+      activeIdRef.current = id;
+      setActiveProject(waypoint.project ?? null);
+      setActiveMarker(id);
+
+      if (!waypoint.project) {
+        // India is the initial static state. Do not animate the
+        // camera or wait for route data on the first paint.
+        map.stop();
+        setRouteData([]);
+        map.jumpTo({
+          center: waypoint.camera.center,
+          zoom: waypoint.camera.zoom,
+          pitch: waypoint.camera.pitch,
+          bearing: waypoint.camera.bearing,
+        });
         return;
       }
 
-      const camera =
-        waypoint.camera;
+      const project = waypoint.project;
+      let coordinates = routeCacheRef.current[project.id];
 
-      // A true instant snap — no easeTo. For long hops
-      // (e.g. Colaba -> Bangalore, Bangalore -> London)
-      // an animated ease still has to visually travel the
-      // real distance, which means zooming out to a wide
-      // overview mid-flight (real tile loading) before
-      // zooming back in. Landing on that mid-flight frame
-      // is exactly what made the route look disconnected
-      // from its marker — jumpTo never has that window.
-      map.jumpTo({
-        center:
-          camera.center,
+      if (!coordinates) {
+        // Use a visual route immediately so the camera never waits.
+        const fallback = fallbackRoadRoute(project);
+        animateRoadAndCamera(waypoint, fallback);
 
-        zoom:
-          camera.zoom,
+        coordinates = await fetchRoadRoute(project);
+        routeCacheRef.current[project.id] = coordinates;
 
-        pitch:
-          camera.pitch,
+        // If the user is still on this waypoint, replace the fallback
+        // with the actual road route and draw it again.
+        if (activeIndexRef.current !== index) return;
 
-        bearing:
-          camera.bearing,
-      });
-
-      const id =
-        waypoint.project?.id ??
-        null;
-
-      if (
-        activeIdRef.current !==
-        id
-      ) {
-        activeIdRef.current =
-          id;
-
-        setActiveProject(
-          waypoint.project
-        );
-
-        setActiveMarker(id);
+        map.stop();
+        animateRoadAndCamera(waypoint, coordinates);
+        return;
       }
 
-      applyRoute(
-        waypoint.project
-      );
-    }, [applyRoute, setActiveMarker]);
+      animateRoadAndCamera(waypoint, coordinates);
+    }, [animateRoadAndCamera, setActiveMarker]);
 
   /* =====================================================
      SCROLL → ACTIVE WAYPOINT
@@ -850,6 +984,8 @@ function WorldMap() {
             type:
               "geojson",
 
+            lineMetrics: true,
+
             data: {
               type: "Feature",
 
@@ -885,14 +1021,10 @@ function WorldMap() {
           },
 
           paint: {
-            "line-color":
-              "#d8ffff",
-
-            "line-width":
-              3,
-
-            "line-opacity":
-              0.95,
+            "line-color": "#9ff8ff",
+            "line-width": 4,
+            "line-opacity": 0.92,
+            "line-blur": 0.3,
           },
         });
 
@@ -978,14 +1110,11 @@ function WorldMap() {
           ) => {
             const markerElement =
               document.createElement(
-                "button"
+                "div"
               );
 
             markerElement.className =
               "brainwing-scroll-marker";
-
-            markerElement.type =
-              "button";
 
             markerElement.innerHTML = `
               <span class="marker-pulse"></span>
@@ -1004,7 +1133,41 @@ function WorldMap() {
               <span class="marker-label">
                 ${project.city.toUpperCase()}
               </span>
+
+              <span class="project-popup-mount"></span>
             `;
+
+            /* ==============================================
+               PROJECT POPUP
+            ============================================== */
+
+            const popupMount =
+              markerElement.querySelector(
+                ".project-popup-mount"
+              );
+
+            if (popupMount) {
+              const popupRoot =
+                createRoot(
+                  popupMount
+                );
+
+              popupRootsRef.current[
+                project.id
+              ] = popupRoot;
+
+              popupRoot.render(
+                <ProjectMarkerPopup
+                  project={project}
+                  onOpenProject={(item) => {
+                    setSelectedProjectItem({
+                      item,
+                      location: project,
+                    });
+                  }}
+                />
+              );
+            }
 
             markerElement.setAttribute(
               "aria-label",
@@ -1035,11 +1198,8 @@ function WorldMap() {
 
             const marker =
               new maptilersdk.Marker({
-                element:
-                  markerElement,
-
-                anchor:
-                  "center",
+                element: markerElement,
+                anchor: "center",
               })
                 .setLngLat([
                   project.lng,
@@ -1052,6 +1212,22 @@ function WorldMap() {
             );
           }
         );
+
+        /* ==============================================
+           PREFETCH ROAD ROUTES IN THE BACKGROUND
+
+           The map itself becomes usable immediately. Routes
+           are fetched after load so the first interaction is
+           not held hostage by routing/network latency.
+        ============================================== */
+
+        journeyProjects.forEach((project, index) => {
+          window.setTimeout(() => {
+            fetchRoadRoute(project).then((coordinates) => {
+              routeCacheRef.current[project.id] = coordinates;
+            });
+          }, index * 350);
+        });
 
         /* ==============================================
            BUILD SCROLL JOURNEY
@@ -1070,11 +1246,10 @@ function WorldMap() {
            Helps prevent first-load visual glitch.
         ============================================== */
 
-        requestAnimationFrame(
-          () => {
-            map.resize();
-          }
-        );
+        requestAnimationFrame(() => {
+          map.resize();
+          setMapReady(true);
+        });
       }
     );
 
@@ -1096,6 +1271,21 @@ function WorldMap() {
 
       scrollTriggerRef.current =
         null;
+
+      if (routeAnimationRef.current) {
+        cancelAnimationFrame(routeAnimationRef.current);
+      }
+
+      routeAnimationRef.current = null;
+
+      Object.values(
+        popupRootsRef.current
+      ).forEach((root) => {
+        root.unmount();
+      });
+
+      popupRootsRef.current =
+        {};
 
       markersRef.current.forEach(
         (marker) =>
@@ -1145,7 +1335,7 @@ function WorldMap() {
 
   return (
     <section
-      className="world-map-story"
+      className={`world-map-story${mapReady ? " is-map-ready" : ""}`}
       ref={storyRef}
       style={{
         minHeight:
@@ -1165,11 +1355,17 @@ function WorldMap() {
       >
 
         <div
-          ref={
-            mapContainerRef
-          }
+          ref={mapContainerRef}
           className="world-map"
         />
+
+        {!mapReady && (
+          <div className="map-loading-screen" aria-live="polite">
+            <span>BRAINWING</span>
+            <strong>INITIALIZING MAP</strong>
+            <i><b /></i>
+          </div>
+        )}
 
         <div className="map-vignette" />
 
@@ -1215,19 +1411,13 @@ function WorldMap() {
           </div>
         )}
 
-        {/* =================================================
-            PROJECT PANEL
-        ================================================= */}
-
-        <LocationPanel
-          location={
-            activeProject
-          }
-
-          onClose={
-            resetMap
-          }
-        />
+        {selectedProjectItem && (
+          <ProjectViewer
+            item={selectedProjectItem.item}
+            location={selectedProjectItem.location}
+            onClose={() => setSelectedProjectItem(null)}
+          />
+        )}
 
         {/* =================================================
             MAP CONTROLS
@@ -1365,4 +1555,4 @@ function WorldMap() {
   );
 }
 
-export default WorldMap;
+export default WorldMap
