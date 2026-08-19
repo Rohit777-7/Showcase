@@ -134,25 +134,15 @@ function cityCameraFor(project) {
 
 /* =====================================================
    JOURNEY SETTINGS
-===================================================== */
 
-const DWELL = 0;
+   SCROLL_VH_PER_UNIT controls how much page scroll each
+   waypoint's "hop" weight is worth. The camera no longer
+   animates through this range — see WAYPOINTS below —
+   it just gives the reader scroll room to sit on each
+   stop before the next one snaps in.
+===================================================== */
 
 const SCROLL_VH_PER_UNIT = 90;
-
-/* =====================================================
-   TERRAIN GATING
-
-   Terrain relief / 3D buildings are unnecessary at the
-   INDIA overview zoom and still cost a full GPU
-   re-render on every jumpTo. Below this zoom they're
-   switched off entirely; every city stop is well above it
-   (12.4+), so local hops are unaffected.
-===================================================== */
-
-const TERRAIN_MIN_ZOOM = 9;
-
-const TERRAIN_EXAGGERATION = 1.2;
 
 /* =====================================================
    WAYPOINTS
@@ -174,6 +164,13 @@ const TERRAIN_EXAGGERATION = 1.2;
    BANGALORE
        ↓
    LONDON
+
+   The camera SNAPS directly between these stops on
+   scroll instead of flying through every point in
+   between — see goToWaypoint() below. That's what keeps
+   tile loading to "one stop at a time" instead of the
+   map continuously streaming tiles for every coordinate
+   along a flight path.
 ===================================================== */
 
 const waypoints = [
@@ -200,7 +197,7 @@ const waypoints = [
       bearing: -5,
     },
 
-    // Initial state only — first scroll immediately moves
+    // Initial state only — first scroll immediately snaps
     // from India to BrainWing.
     hop: 0,
   },
@@ -283,19 +280,59 @@ const waypoints = [
 ];
 
 /* =====================================================
-   EMPTY ROUTE
+   SCROLL → WAYPOINT LOOKUP
+
+   Every waypoint after the first owns a fixed chunk of
+   the page's scroll range (sized by its "hop" weight).
+   waypointThresholds[i] is the scroll position (in hop
+   units) at which waypoint i becomes active.
 ===================================================== */
 
-function emptyLineFeature() {
-  return {
-    type: "Feature",
+const waypointThresholds = (() => {
+  const thresholds = [0];
 
-    geometry: {
-      type: "LineString",
+  let cursor = 0;
 
-      coordinates: [],
-    },
-  };
+  for (
+    let i = 1;
+    i < waypoints.length;
+    i++
+  ) {
+    cursor +=
+      waypoints[i].hop ?? 1;
+
+    thresholds.push(cursor);
+  }
+
+  return thresholds;
+})();
+
+const TOTAL_JOURNEY_UNITS =
+  waypointThresholds[
+    waypointThresholds.length - 1
+  ];
+
+function waypointIndexForScrollUnits(
+  scrollUnits
+) {
+  let index = 0;
+
+  for (
+    let i = 1;
+    i < waypointThresholds.length;
+    i++
+  ) {
+    if (
+      scrollUnits >=
+      waypointThresholds[i]
+    ) {
+      index = i;
+    } else {
+      break;
+    }
+  }
+
+  return index;
 }
 
 /* =====================================================
@@ -339,213 +376,6 @@ function straightLineCoordinatesFor(
         item.lng,
         item.lat,
       ]),
-  ];
-}
-
-
-/* =====================================================
-   PROGRESSIVE ROUTE DRAWING
-
-   The route is drawn together with the camera scroll.
-
-   progress = 0
-      → no new route
-
-   progress = 1
-      → full route to the current destination
-===================================================== */
-
-function progressiveLineCoordinates(
-  coordinates,
-  progress
-) {
-  if (
-    !Array.isArray(coordinates) ||
-    coordinates.length < 2
-  ) {
-    return [];
-  }
-
-  const p =
-    Math.max(
-      0,
-      Math.min(1, progress)
-    );
-
-  if (p <= 0) {
-    return [];
-  }
-
-  if (p >= 1) {
-    return coordinates;
-  }
-
-  const distances = [0];
-
-  let totalDistance = 0;
-
-  for (
-    let i = 1;
-    i < coordinates.length;
-    i++
-  ) {
-    const [x1, y1] =
-      coordinates[i - 1];
-
-    const [x2, y2] =
-      coordinates[i];
-
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-
-    totalDistance +=
-      Math.sqrt(
-        dx * dx +
-        dy * dy
-      );
-
-    distances.push(
-      totalDistance
-    );
-  }
-
-  if (totalDistance <= 0) {
-    return coordinates.slice(
-      0,
-      2
-    );
-  }
-
-  const targetDistance =
-    totalDistance * p;
-
-  const result = [
-    coordinates[0],
-  ];
-
-  for (
-    let i = 1;
-    i < coordinates.length;
-    i++
-  ) {
-    if (
-      distances[i] <
-      targetDistance
-    ) {
-      result.push(
-        coordinates[i]
-      );
-
-      continue;
-    }
-
-    const previousDistance =
-      distances[i - 1];
-
-    const segmentDistance =
-      distances[i] -
-      previousDistance;
-
-    const localProgress =
-      segmentDistance > 0
-        ? (
-            targetDistance -
-            previousDistance
-          ) /
-          segmentDistance
-        : 0;
-
-    const [x1, y1] =
-      coordinates[i - 1];
-
-    const [x2, y2] =
-      coordinates[i];
-
-    result.push([
-      x1 +
-        (x2 - x1) *
-          localProgress,
-
-      y1 +
-        (y2 - y1) *
-          localProgress,
-    ]);
-
-    break;
-  }
-
-  return result;
-}
-
-
-function progressiveRouteFromPrevious(
-  coordinates,
-  previousPoint,
-  progress
-) {
-  if (
-    !Array.isArray(coordinates) ||
-    coordinates.length < 2 ||
-    !previousPoint
-  ) {
-    return [];
-  }
-
-  let nearestIndex = 0;
-  let nearestDistance = Infinity;
-
-  coordinates.forEach(
-    (coordinate, index) => {
-      const dx =
-        coordinate[0] -
-        previousPoint[0];
-
-      const dy =
-        coordinate[1] -
-        previousPoint[1];
-
-      const distance =
-        dx * dx + dy * dy;
-
-      if (
-        distance <
-        nearestDistance
-      ) {
-        nearestDistance =
-          distance;
-
-        nearestIndex =
-          index;
-      }
-    }
-  );
-
-  const completed =
-    coordinates.slice(
-      0,
-      nearestIndex + 1
-    );
-
-  const currentSegment =
-    coordinates.slice(
-      nearestIndex
-    );
-
-  const partial =
-    progressiveLineCoordinates(
-      currentSegment,
-      progress
-    );
-
-  if (
-    partial.length <= 1
-  ) {
-    return completed;
-  }
-
-  return [
-    ...completed,
-    ...partial.slice(1),
   ];
 }
 
@@ -609,8 +439,7 @@ async function fetchRoadRoute(
 
    Stores the in-flight/resolved promise, not just the
    result, so two near-simultaneous requests for the same
-   project (enterWaypoint + a quick scroll back) share one
-   fetch instead of firing twice.
+   project don't fire twice.
 ===================================================== */
 
 const roadRouteCache = new Map();
@@ -692,110 +521,6 @@ function cleanMapLabels(map) {
 }
 
 /* =====================================================
-   3D BUILDINGS
-===================================================== */
-
-function addRealisticBuildings(map) {
-  const existingBuildingLayer =
-    map
-      .getStyle()
-      ?.layers
-      ?.find(
-        (layer) =>
-          layer[
-            "source-layer"
-          ] === "building"
-      );
-
-  if (
-    !existingBuildingLayer
-  ) {
-    return;
-  }
-
-  if (
-    map.getLayer(
-      "brainwing-3d-buildings"
-    )
-  ) {
-    return;
-  }
-
-  map.addLayer({
-    id:
-      "brainwing-3d-buildings",
-
-    type:
-      "fill-extrusion",
-
-    source:
-      existingBuildingLayer.source,
-
-    "source-layer":
-      "building",
-
-    minzoom: 13,
-
-    // Starts hidden — matches terrainActiveRef's initial
-    // false; syncCamera() flips this in step with terrain.
-    layout: {
-      visibility:
-        "none",
-    },
-
-    paint: {
-      "fill-extrusion-color": [
-        "interpolate",
-        ["linear"],
-        [
-          "coalesce",
-          ["get", "render_height"],
-          ["get", "height"],
-          8,
-        ],
-
-        0,
-        "#0a1620",
-
-        30,
-        "#123244",
-
-        90,
-        "#1c4a5e",
-
-        180,
-        "#2f7a8f",
-      ],
-
-      "fill-extrusion-height": [
-        "coalesce",
-        ["get", "render_height"],
-        ["get", "height"],
-        8,
-      ],
-
-      "fill-extrusion-base": [
-        "coalesce",
-        [
-          "get",
-          "render_min_height",
-        ],
-
-        [
-          "get",
-          "min_height",
-        ],
-
-        0,
-      ],
-
-      "fill-extrusion-opacity":
-        0.92,
-    },
-  });
-}
-
-/* =====================================================
    WORLD MAP
 ===================================================== */
 
@@ -818,31 +543,17 @@ function WorldMap() {
   const markerElsRef =
     useRef({});
 
-  const timelineRef =
+  const scrollTriggerRef =
     useRef(null);
 
-  const breakpointsRef =
-    useRef([]);
-
-  const cameraProxyRef =
-    useRef({
-      ...waypoints[0].camera,
-    });
+  const activeIndexRef =
+    useRef(0);
 
   const activeIdRef =
     useRef(null);
 
-  const terrainActiveRef =
-    useRef(false);
-
   const routeRequestIdRef =
     useRef(0);
-
-  // Keeps the best available route geometry for each project.
-  // Starts with straight coordinates and upgrades to road
-  // geometry when MapTiler routing resolves.
-  const routeGeometryRef =
-    useRef(new Map());
 
   const stickyRef =
     useRef(null);
@@ -903,12 +614,13 @@ function WorldMap() {
   /* =====================================================
      APPLY ROUTE
 
-     Shows the straight-line path immediately (so the
-     route is never empty while a request is in flight),
-     then swaps in the real road-routed geometry once it
-     resolves — see roadRouteCoordinatesFor() above, which
-     caches per project and falls back to the straight
-     line on any fetch failure.
+     Draws the full HQ → ... → current-city path in one
+     shot (no per-frame progressive redraw). Shows the
+     straight-line fallback immediately, then swaps in the
+     real road-routed geometry once it resolves — see
+     roadRouteCoordinatesFor() above, which caches per
+     project and falls back to the straight line on fetch
+     failure.
 
      routeRequestIdRef guards against a slow response for
      a project the user has since scrolled past
@@ -926,18 +638,10 @@ function WorldMap() {
         return;
       }
 
-      const fallbackRoute =
+      setActiveRoute(
         straightLineCoordinatesFor(
           project
-        );
-
-      routeGeometryRef.current.set(
-        project.id,
-        fallbackRoute
-      );
-
-      setActiveRoute(
-        fallbackRoute
+        )
       );
 
       roadRouteCoordinatesFor(
@@ -952,11 +656,6 @@ function WorldMap() {
           return;
         }
 
-        routeGeometryRef.current.set(
-          project.id,
-          coordinates
-        );
-
         setActiveRoute(
           coordinates
         );
@@ -964,17 +663,63 @@ function WorldMap() {
     }, [setActiveRoute]);
 
   /* =====================================================
-     ENTER PROJECT
+     GO TO WAYPOINT
 
-     When scroll reaches a project:
-
-     HQ → current project
-
-     route becomes visible.
+     Snaps the camera directly to a waypoint's final
+     position (a single short easeTo, not a scroll-linked
+     tween through every intermediate point) so the map
+     only ever needs tiles for real stops.
   ===================================================== */
 
-  const enterWaypoint =
-    useCallback((waypoint) => {
+  const goToWaypoint =
+    useCallback((index, { animate = true } = {}) => {
+      const waypoint =
+        waypoints[index];
+
+      const map =
+        mapRef.current;
+
+      if (!waypoint || !map) {
+        return;
+      }
+
+      const camera =
+        waypoint.camera;
+
+      if (animate) {
+        map.easeTo({
+          center:
+            camera.center,
+
+          zoom:
+            camera.zoom,
+
+          pitch:
+            camera.pitch,
+
+          bearing:
+            camera.bearing,
+
+          duration: 500,
+
+          essential: true,
+        });
+      } else {
+        map.jumpTo({
+          center:
+            camera.center,
+
+          zoom:
+            camera.zoom,
+
+          pitch:
+            camera.pitch,
+
+          bearing:
+            camera.bearing,
+        });
+      }
+
       const id =
         waypoint.project?.id ??
         null;
@@ -999,242 +744,15 @@ function WorldMap() {
     }, [applyRoute, setActiveMarker]);
 
   /* =====================================================
-     DURING CAMERA TRANSITION
+     SCROLL → ACTIVE WAYPOINT
 
-     IMPORTANT:
-
-     Never add camera coordinates
-     to route.
+     Cheap on every scroll frame: just a lookup, no camera
+     work. The map only moves when the resolved index
+     actually changes.
   ===================================================== */
 
-  const transitFrom =
-    useCallback((fromWaypoint) => {
-      if (
-        activeIdRef.current !==
-        null
-      ) {
-        activeIdRef.current =
-          null;
-
-        setActiveProject(
-          null
-        );
-
-        setActiveMarker(
-          null
-        );
-      }
-
-      // Keep the route that has already been completed.
-      // Do not wait for the next destination to be reached.
-      if (fromWaypoint.project) {
-        const route =
-          routeGeometryRef.current.get(
-            fromWaypoint.project.id
-          );
-
-        if (route) {
-          setActiveRoute(
-            route
-          );
-        } else {
-          applyRoute(
-            fromWaypoint.project
-          );
-        }
-      } else {
-        setActiveRoute([]);
-      }
-    }, [applyRoute, setActiveMarker, setActiveRoute]);
-
-  /* =====================================================
-     SYNC JOURNEY STATE
-  ===================================================== */
-
-  const syncJourneyState =
-    useCallback((time) => {
-      const breakpoints =
-        breakpointsRef.current;
-
-      if (
-        !breakpoints.length
-      ) {
-        return;
-      }
-
-      /* ================================================
-         PROJECT ARRIVAL
-      ================================================= */
-
-      for (
-        let k = 0;
-        k <
-        breakpoints.length;
-        k++
-      ) {
-        const bp =
-          breakpoints[k];
-
-        const isLast =
-          k ===
-          breakpoints.length -
-            1;
-
-        if (
-          time >= bp.arrive &&
-          (
-            isLast ||
-            time < bp.leave
-          )
-        ) {
-          enterWaypoint(
-            bp.waypoint
-          );
-
-          return;
-        }
-      }
-
-      /* ================================================
-         BETWEEN PROJECTS
-      ================================================= */
-
-      for (
-        let k = 0;
-        k <
-        breakpoints.length -
-          1;
-        k++
-      ) {
-        if (
-          time >=
-            breakpoints[k]
-              .leave &&
-          time <
-            breakpoints[
-              k + 1
-            ].arrive
-        ) {
-          transitFrom(
-            breakpoints[k]
-              .waypoint
-          );
-
-          return;
-        }
-      }
-    }, [enterWaypoint, transitFrom]);
-
-  /* =====================================================
-     BUILD CAMERA TIMELINE
-  ===================================================== */
-
-  const buildJourneyTimeline =
-    useCallback((map) => {
-      const proxy =
-        cameraProxyRef.current;
-
-      const breakpoints = [
-        {
-          waypoint:
-            waypoints[0],
-
-          arrive: 0,
-
-          leave: DWELL,
-        },
-      ];
-
-      /* ================================================
-         SYNC CAMERA
-
-         jumpTo is already the cheap, non-animated path
-         (GSAP's own ticker already batches this to one
-         call per animation frame, so there's no cheaper
-         per-tick update to throttle to).
-
-         What actually made every tick expensive was
-         terrain + 3D buildings recomputing a full GPU
-         scene even during the low-zoom WORLDWIDE/INDIA
-         legs where neither is visible. Both are now
-         toggled on/off only when crossing the zoom
-         threshold, not re-applied every frame.
-      ================================================= */
-
-      const syncCamera =
-        () => {
-          map.jumpTo({
-            center: [
-              proxy.lng,
-              proxy.lat,
-            ],
-
-            zoom:
-              proxy.zoom,
-
-            pitch:
-              proxy.pitch,
-
-            bearing:
-              proxy.bearing,
-          });
-
-          const shouldHaveTerrain =
-            proxy.zoom >=
-            TERRAIN_MIN_ZOOM;
-
-          if (
-            shouldHaveTerrain !==
-            terrainActiveRef.current
-          ) {
-            terrainActiveRef.current =
-              shouldHaveTerrain;
-
-            if (
-              shouldHaveTerrain
-            ) {
-              map.enableTerrain(
-                TERRAIN_EXAGGERATION
-              );
-            } else {
-              map.disableTerrain();
-            }
-
-            if (
-              map.getLayer(
-                "brainwing-3d-buildings"
-              )
-            ) {
-              map.setLayoutProperty(
-                "brainwing-3d-buildings",
-                "visibility",
-                shouldHaveTerrain
-                  ? "visible"
-                  : "none"
-              );
-            }
-          }
-
-          if (
-            compassNeedleRef.current
-          ) {
-            compassNeedleRef.current.style.transform =
-              `rotate(${-proxy.bearing}deg)`;
-          }
-        };
-
-      /* ================================================
-         SCRUBBING STATE
-
-         Panels overlaying the canvas use backdrop-filter
-         blur, which forces a re-composite of the live
-         WebGL layer beneath them on every repaint. That's
-         fine at rest, but during active scroll (every
-         frame repainting anyway) it's pure added cost —
-         so it's suspended while scrubbing and restored a
-         moment after scrolling settles.
-      ================================================= */
-
+  const setupScrollJourney =
+    useCallback(() => {
       const markScrubbing =
         () => {
           stickyRef.current?.classList.add(
@@ -1257,233 +775,44 @@ function WorldMap() {
             }, 160);
         };
 
-      const tl =
-        gsap.timeline({
-          scrollTrigger: {
-            trigger:
-              storyRef.current,
+      scrollTriggerRef.current =
+        ScrollTrigger.create({
+          trigger:
+            storyRef.current,
 
-            start:
-              "top top",
+          start:
+            "top top",
 
-            end:
-              "bottom bottom",
+          end:
+            "bottom bottom",
 
-            scrub: 0.7,
+          onUpdate:
+            (self) => {
+              markScrubbing();
 
-            onUpdate:
-              () => {
-                markScrubbing();
+              const scrollUnits =
+                self.progress *
+                TOTAL_JOURNEY_UNITS;
 
-                syncJourneyState(
-                  tl.time()
+              const index =
+                waypointIndexForScrollUnits(
+                  scrollUnits
                 );
-              },
-          },
+
+              if (
+                index !==
+                activeIndexRef.current
+              ) {
+                activeIndexRef.current =
+                  index;
+
+                goToWaypoint(
+                  index
+                );
+              }
+            },
         });
-
-      let cursor =
-        DWELL;
-
-      /* ================================================
-         CAMERA JOURNEY
-      ================================================= */
-
-      for (
-        let i = 1;
-        i <
-        waypoints.length;
-        i++
-      ) {
-        const waypoint =
-          waypoints[i];
-
-        const hopLength =
-          waypoint.hop ??
-          1;
-
-        const target =
-          waypoint.camera;
-
-        /*
-         * INDIA → BRAINWING
-         *
-         * No project route is drawn here.
-         * BrainWing is the fixed HQ.
-         */
-        const isProjectWaypoint =
-          Boolean(
-            waypoint.project
-          );
-
-        const targetProject =
-          waypoint.project;
-
-        /*
-         * Start with the straight fallback immediately.
-         * If the routing request resolves later, the same
-         * scroll animation will automatically use the road
-         * geometry from that point onward.
-         */
-        let routeCoordinates =
-          targetProject
-            ? (
-                routeGeometryRef.current.get(
-                  targetProject.id
-                ) ??
-                straightLineCoordinatesFor(
-                  targetProject
-                )
-              )
-            : [];
-
-        if (
-          targetProject &&
-          !routeGeometryRef.current.has(
-            targetProject.id
-          )
-        ) {
-          routeGeometryRef.current.set(
-            targetProject.id,
-            routeCoordinates
-          );
-
-          roadRouteCoordinatesFor(
-            targetProject,
-            maptilersdk.config.apiKey
-          ).then((coordinates) => {
-            routeGeometryRef.current.set(
-              targetProject.id,
-              coordinates
-            );
-          });
-        }
-
-        const segmentStart =
-          cursor;
-
-        tl.to(
-          proxy,
-          {
-            lng:
-              target.center[0],
-
-            lat:
-              target.center[1],
-
-            zoom:
-              target.zoom,
-
-            pitch:
-              target.pitch,
-
-            bearing:
-              target.bearing,
-
-            duration:
-              hopLength,
-
-            ease:
-              "power1.inOut",
-
-            onUpdate:
-              () => {
-                syncCamera();
-
-                /*
-                 * Draw the connecting route at the same
-                 * progress as the camera.
-                 *
-                 * India → BrainWing:
-                 * no route because BrainWing is the HQ.
-                 *
-                 * BrainWing → Borivali:
-                 * route grows from 0 → full.
-                 *
-                 * Borivali → Thane:
-                 * completed Borivali route stays visible
-                 * while the route extends toward Thane.
-                 */
-                if (
-                  isProjectWaypoint &&
-                  targetProject
-                ) {
-                  const progress =
-                    hopLength > 0
-                      ? Math.max(
-                          0,
-                          Math.min(
-                            1,
-                            (
-                              tl.time() -
-                              segmentStart
-                            ) /
-                              hopLength
-                          )
-                        )
-                      : 1;
-
-                  const latestRoute =
-                    routeGeometryRef.current.get(
-                      targetProject.id
-                    ) ??
-                    routeCoordinates;
-
-                  const previousWaypoint =
-                    waypoints[i - 1];
-
-                  const previousPoint =
-                    previousWaypoint.project
-                      ? [
-                          previousWaypoint.project.lng,
-                          previousWaypoint.project.lat,
-                        ]
-                      : [
-                          BRAINWING_HQ.lng,
-                          BRAINWING_HQ.lat,
-                        ];
-
-                  setActiveRoute(
-                    progressiveRouteFromPrevious(
-                      latestRoute,
-                      previousPoint,
-                      progress
-                    )
-                  );
-                } else {
-                  setActiveRoute([]);
-                }
-              },
-          },
-
-          cursor
-        );
-
-        cursor +=
-          hopLength;
-
-        breakpoints.push({
-          waypoint,
-
-          arrive:
-            cursor,
-
-          leave:
-            cursor + DWELL,
-        });
-
-        cursor +=
-          DWELL;
-      }
-
-      timelineRef.current =
-        tl;
-
-      breakpointsRef.current =
-        breakpoints;
-
-      syncJourneyState(0);
-    }, [syncJourneyState]);
+    }, [goToWaypoint]);
 
   /* =====================================================
      SCROLL TO PROJECT
@@ -1491,31 +820,28 @@ function WorldMap() {
 
   const scrollToProject =
     useCallback((project) => {
-      const tl =
-        timelineRef.current;
-
       const storyEl =
         storyRef.current;
 
-      const breakpoint =
-        breakpointsRef.current.find(
-          (bp) =>
-            bp.waypoint.project
-              ?.id ===
+      const index =
+        waypoints.findIndex(
+          (wp) =>
+            wp.project?.id ===
             project.id
         );
 
       if (
-        !tl ||
         !storyEl ||
-        !breakpoint
+        index < 0
       ) {
         return;
       }
 
       const fraction =
-        breakpoint.arrive /
-        tl.duration();
+        waypointThresholds[
+          index
+        ] /
+        TOTAL_JOURNEY_UNITS;
 
       const scrollRange =
         storyEl.offsetHeight -
@@ -1616,14 +942,34 @@ function WorldMap() {
         scrollZoom:
           false,
 
-        // Terrain starts disabled — the initial camera
-        // (waypoints[0], zoom 4.6) is below
-        // TERRAIN_MIN_ZOOM, and syncCamera() enables it
-        // once scroll brings zoom into city range.
+        // No terrain / 3D buildings — they were forcing a
+        // full GPU scene rebuild (and, for terrain, extra
+        // tile requests) on every camera move. The journey
+        // reads fine as a flat, fast map.
       });
 
     mapRef.current =
       map;
+
+    /* =================================================
+       COMPASS SYNC
+
+       Keep the compass needle in step with the map's
+       actual bearing (including the short easeTo
+       animations), instead of recomputing it by hand.
+    ================================================= */
+
+    map.on(
+      "rotate",
+      () => {
+        if (
+          compassNeedleRef.current
+        ) {
+          compassNeedleRef.current.style.transform =
+            `rotate(${-map.getBearing()}deg)`;
+        }
+      }
+    );
 
     /* =================================================
        MAP LOAD
@@ -1641,14 +987,6 @@ function WorldMap() {
         );
 
         /* ==============================================
-           3D BUILDINGS
-        ============================================== */
-
-        addRealisticBuildings(
-          map
-        );
-
-        /* ==============================================
            ROUTE SOURCE
         ============================================== */
 
@@ -1658,55 +996,25 @@ function WorldMap() {
             type:
               "geojson",
 
-            data:
-              emptyLineFeature(),
+            data: {
+              type: "Feature",
+
+              geometry: {
+                type: "LineString",
+
+                coordinates: [],
+              },
+            },
           }
         );
 
         /* ==============================================
-           ROUTE GLOW
+           ROUTE LINE
         ============================================== */
 
         map.addLayer({
           id:
-            "brainwing-route-active-glow",
-
-          type:
-            "line",
-
-          source:
             "brainwing-route-active",
-
-          layout: {
-            "line-cap":
-              "round",
-
-            "line-join":
-              "round",
-          },
-
-          paint: {
-            "line-color":
-              "#69f4ff",
-
-            "line-width":
-              10,
-
-            "line-opacity":
-              0.18,
-
-            "line-blur":
-              3,
-          },
-        });
-
-        /* ==============================================
-           ROUTE CORE
-        ============================================== */
-
-        map.addLayer({
-          id:
-            "brainwing-route-active-core",
 
           type:
             "line",
@@ -1901,9 +1209,14 @@ function WorldMap() {
            BUILD SCROLL JOURNEY
         ============================================== */
 
-        buildJourneyTimeline(
-          map
-        );
+        setupScrollJourney();
+
+        activeIndexRef.current =
+          0;
+
+        goToWaypoint(0, {
+          animate: false,
+        });
 
         /* ==============================================
            FORCE INITIAL MAP RESIZE
@@ -1932,14 +1245,10 @@ function WorldMap() {
         );
       }
 
-      timelineRef.current
-        ?.scrollTrigger
+      scrollTriggerRef.current
         ?.kill();
 
-      timelineRef.current
-        ?.kill();
-
-      timelineRef.current =
+      scrollTriggerRef.current =
         null;
 
       markersRef.current.forEach(
@@ -1985,27 +1294,6 @@ function WorldMap() {
     }, []);
 
   /* =====================================================
-     TOTAL SCROLL DISTANCE
-  ===================================================== */
-
-  const totalJourneyUnits =
-    DWELL +
-    waypoints
-      .slice(1)
-      .reduce(
-        (
-          sum,
-          wp
-        ) =>
-          sum +
-          (wp.hop ??
-            1) +
-          DWELL,
-
-        0
-      );
-
-  /* =====================================================
      UI
   ===================================================== */
 
@@ -2016,7 +1304,7 @@ function WorldMap() {
       style={{
         minHeight:
           `${
-            totalJourneyUnits *
+            TOTAL_JOURNEY_UNITS *
             SCROLL_VH_PER_UNIT
           }vh`,
       }}
